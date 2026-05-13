@@ -266,7 +266,7 @@ export async function analyzeFace(dataUrl: string): Promise<RealAnalysisResult> 
   }
 
   if (detections.length === 0) {
-    throw new FaceAnalysisError("no-face", "얼굴을 찾지 못했습니다. 정면 사진을 업로드해주세요.");
+    throw new FaceAnalysisError("no-face", "얼굴을 찾지 못했습니다. 얼굴이 크게 보이는 밝은 정면 사진으로 다시 시도해주세요.");
   }
   if (detections.length > 1) {
     throw new FaceAnalysisError("multi-face", "여러 명이 감지되었습니다. 한 명만 나오는 사진을 사용해주세요.");
@@ -281,7 +281,7 @@ export async function analyzeFace(dataUrl: string): Promise<RealAnalysisResult> 
   const jawWidth = Math.abs(jawRight.x - jawLeft.x);
   const offset = Math.abs(nose.x - jawMidX) / jawWidth;
   if (offset > 0.2) {
-    throw new FaceAnalysisError("not-frontal", "정면 각도가 아닙니다. 정면을 바라보는 사진을 사용해주세요.");
+    throw new FaceAnalysisError("not-frontal", "얼굴이 너무 옆으로 돌아가 있습니다. 카메라를 정면으로 보고 다시 촬영해주세요.");
   }
 
   const { shape, reason: shapeReason, metrics } = classifyFaceShape(points);
