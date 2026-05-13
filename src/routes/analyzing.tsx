@@ -50,7 +50,7 @@ function AnalyzingPage() {
 
     (async () => {
       try {
-        const { analyzeFace, loadModels, FaceAnalysisError } = await import("@/lib/face-analyzer");
+        const { analyzeFace, loadModels } = await import("@/lib/face-analyzer");
         await loadModels();
         const result = await analyzeFace(img);
         if (cancelled) return;
