@@ -50,6 +50,7 @@ function AnalyzingPage() {
 
     (async () => {
       try {
+        const { analyzeFace, loadModels, FaceAnalysisError } = await import("@/lib/face-analyzer");
         await loadModels();
         const result = await analyzeFace(img);
         if (cancelled) return;
@@ -58,12 +59,10 @@ function AnalyzingPage() {
         setProgress(100);
         setStage(STAGES.length - 1);
         setTimeout(() => navigate({ to: "/result" }), 400);
-      } catch (e) {
+      } catch (e: unknown) {
         if (cancelled) return;
         clearInterval(tick);
-        const msg = e instanceof FaceAnalysisError
-          ? e.message
-          : e instanceof Error ? e.message : "분석 중 오류가 발생했습니다.";
+        const msg = e instanceof Error ? e.message : "분석 중 오류가 발생했습니다.";
         setError(msg);
       }
     })();
