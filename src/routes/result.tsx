@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Check, Copy, Download, RefreshCw, Share2, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
-import type { AnalysisResult } from "@/lib/analysis";
+import type { RealAnalysisResult } from "@/lib/face-analyzer";
 import { loadAnalysis } from "@/lib/analysis-store";
 
 export const Route = createFileRoute("/result")({
