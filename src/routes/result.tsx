@@ -99,8 +99,23 @@ function ResultPage() {
                 />
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                얼굴 랜드마크와 피부 톤 샘플을 종합한 분석 정확도입니다.
+                얼굴 랜드마크 68점과 피부 픽셀 샘플을 종합한 분석 정확도입니다.
               </p>
+            </div>
+
+            {/* Skin RGB swatch */}
+            <div className="mt-5 rounded-2xl border border-border bg-surface p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">측정된 피부톤</p>
+              <div className="mt-2 flex items-center gap-3">
+                <div
+                  className="h-12 w-12 rounded-xl border border-border shadow-elegant"
+                  style={{ background: `rgb(${data.skin.r}, ${data.skin.g}, ${data.skin.b})` }}
+                />
+                <div className="font-mono text-xs text-muted-foreground">
+                  <p>RGB({data.skin.r}, {data.skin.g}, {data.skin.b})</p>
+                  <p>Warmth {data.skin.warmth} · Bright {(data.skin.brightness * 100).toFixed(0)}% · Sat {(data.skin.saturation * 100).toFixed(0)}%</p>
+                </div>
+              </div>
             </div>
 
             <Link
