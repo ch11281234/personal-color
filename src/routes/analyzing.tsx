@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { AlertCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/Layout";
-import { analyzeFace, FaceAnalysisError, loadModels } from "@/lib/face-analyzer";
 import { loadImage, saveAnalysis } from "@/lib/analysis-store";
 
 export const Route = createFileRoute("/analyzing")({
