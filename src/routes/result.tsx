@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Check, Copy, Download, RefreshCw, Share2, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
-import type { AnalysisResult } from "@/lib/analysis";
+import type { RealAnalysisResult } from "@/lib/face-analyzer";
 import { loadAnalysis } from "@/lib/analysis-store";
 
 export const Route = createFileRoute("/result")({
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/result")({
 
 function ResultPage() {
   const navigate = useNavigate();
-  const [data, setData] = useState<AnalysisResult | null>(null);
+  const [data, setData] = useState<RealAnalysisResult | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -99,8 +99,23 @@ function ResultPage() {
                 />
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                얼굴 랜드마크와 피부 톤 샘플을 종합한 분석 정확도입니다.
+                얼굴 랜드마크 68점과 피부 픽셀 샘플을 종합한 분석 정확도입니다.
               </p>
+            </div>
+
+            {/* Skin RGB swatch */}
+            <div className="mt-5 rounded-2xl border border-border bg-surface p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">측정된 피부톤</p>
+              <div className="mt-2 flex items-center gap-3">
+                <div
+                  className="h-12 w-12 rounded-xl border border-border shadow-elegant"
+                  style={{ background: `rgb(${data.skin.r}, ${data.skin.g}, ${data.skin.b})` }}
+                />
+                <div className="font-mono text-xs text-muted-foreground">
+                  <p>RGB({data.skin.r}, {data.skin.g}, {data.skin.b})</p>
+                  <p>Warmth {data.skin.warmth} · Bright {(data.skin.brightness * 100).toFixed(0)}% · Sat {(data.skin.saturation * 100).toFixed(0)}%</p>
+                </div>
+              </div>
             </div>
 
             <Link
@@ -128,11 +143,14 @@ function ResultPage() {
               </div>
               <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">{pc.name}</h2>
               <p className="mt-2 text-sm text-muted-foreground">{pc.description}</p>
+              <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
+                <span className="font-mono text-primary">AI 근거 · </span>{data.reasons.color}
+              </div>
 
               <div className="mt-5">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">추천 컬러 팔레트</p>
                 <div className="grid grid-cols-6 gap-2">
-                  {pc.palette.map((c) => (
+                  {pc.palette.map((c: string) => (
                     <div key={c} className="group">
                       <div className="aspect-square rounded-xl shadow-elegant transition-transform group-hover:scale-105" style={{ background: c }} />
                       <p className="mt-1.5 text-center font-mono text-[10px] text-muted-foreground">{c}</p>
@@ -145,7 +163,7 @@ function ResultPage() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">패션</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {pc.fashion.map((t) => (
+                    {pc.fashion.map((t: string) => (
                       <span key={t} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium">{t}</span>
                     ))}
                   </div>
@@ -176,6 +194,14 @@ function ResultPage() {
               </div>
               <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">{fs.name}</h2>
               <p className="mt-2 text-sm text-muted-foreground">{fs.description}</p>
+              <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
+                <span className="font-mono text-primary">AI 근거 · </span>{data.reasons.shape}
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center font-mono text-[10px] text-muted-foreground">
+                <Stat label="L/W" value={data.metrics.lengthRatio.toString()} />
+                <Stat label="Jaw°" value={data.metrics.jawAngleDeg.toString()} />
+                <Stat label="Cheek" value={`${data.metrics.cheekWidth}px`} />
+              </div>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <RecBox title="추천 헤어스타일" items={fs.hair} />
@@ -200,6 +226,15 @@ function RecBox({ title, items }: { title: string; items: string[] }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface px-2 py-1.5">
+      <p className="text-foreground">{value}</p>
+      <p className="text-[9px] uppercase tracking-wider">{label}</p>
     </div>
   );
 }

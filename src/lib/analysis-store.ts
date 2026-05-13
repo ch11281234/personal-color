@@ -1,23 +1,23 @@
-import type { AnalysisResult } from "./analysis";
+import type { RealAnalysisResult } from "./face-analyzer";
 
 const KEY = "isaac:last-analysis";
 const IMG_KEY = "isaac:last-image";
 
-export function saveAnalysis(result: AnalysisResult) {
+export function saveAnalysis(result: RealAnalysisResult) {
   if (typeof window === "undefined") return;
   sessionStorage.setItem(KEY, JSON.stringify(result));
 }
 
-export function loadAnalysis(): AnalysisResult | null {
+export function loadAnalysis(): RealAnalysisResult | null {
   if (typeof window === "undefined") return null;
   const raw = sessionStorage.getItem(KEY);
   if (!raw) return null;
-  try { return JSON.parse(raw) as AnalysisResult; } catch { return null; }
+  try { return JSON.parse(raw) as RealAnalysisResult; } catch { return null; }
 }
 
 export function saveImage(dataUrl: string) {
   if (typeof window === "undefined") return;
-  sessionStorage.setItem(IMG_KEY, dataUrl);
+  try { sessionStorage.setItem(IMG_KEY, dataUrl); } catch {}
 }
 
 export function loadImage(): string | null {
