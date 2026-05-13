@@ -143,6 +143,9 @@ function ResultPage() {
               </div>
               <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">{pc.name}</h2>
               <p className="mt-2 text-sm text-muted-foreground">{pc.description}</p>
+              <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
+                <span className="font-mono text-primary">AI 근거 · </span>{data.reasons.color}
+              </div>
 
               <div className="mt-5">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">추천 컬러 팔레트</p>
