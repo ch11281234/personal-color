@@ -132,7 +132,7 @@ function ResultPage() {
               <div className="mt-5">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">추천 컬러 팔레트</p>
                 <div className="grid grid-cols-6 gap-2">
-                  {pc.palette.map((c) => (
+                  {pc.palette.map((c: string) => (
                     <div key={c} className="group">
                       <div className="aspect-square rounded-xl shadow-elegant transition-transform group-hover:scale-105" style={{ background: c }} />
                       <p className="mt-1.5 text-center font-mono text-[10px] text-muted-foreground">{c}</p>
