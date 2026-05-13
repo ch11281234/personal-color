@@ -194,6 +194,14 @@ function ResultPage() {
               </div>
               <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">{fs.name}</h2>
               <p className="mt-2 text-sm text-muted-foreground">{fs.description}</p>
+              <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
+                <span className="font-mono text-primary">AI 근거 · </span>{data.reasons.shape}
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center font-mono text-[10px] text-muted-foreground">
+                <Stat label="L/W" value={data.metrics.lengthRatio.toString()} />
+                <Stat label="Jaw°" value={data.metrics.jawAngleDeg.toString()} />
+                <Stat label="Cheek" value={`${data.metrics.cheekWidth}px`} />
+              </div>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <RecBox title="추천 헤어스타일" items={fs.hair} />
