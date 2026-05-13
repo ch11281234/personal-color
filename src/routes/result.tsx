@@ -229,3 +229,12 @@ function RecBox({ title, items }: { title: string; items: string[] }) {
     </div>
   );
 }
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface px-2 py-1.5">
+      <p className="text-foreground">{value}</p>
+      <p className="text-[9px] uppercase tracking-wider">{label}</p>
+    </div>
+  );
+}
