@@ -145,7 +145,7 @@ function ResultPage() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">패션</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {pc.fashion.map((t) => (
+                    {pc.fashion.map((t: string) => (
                       <span key={t} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium">{t}</span>
                     ))}
                   </div>
