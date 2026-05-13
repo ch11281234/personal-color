@@ -255,7 +255,7 @@ export async function analyzeFace(dataUrl: string): Promise<RealAnalysisResult> 
     new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.2 }),
   ];
 
-  let detections: Awaited<ReturnType<typeof faceapi.detectAllFaces>> | null = null;
+  let detections: faceapi.WithFaceLandmarks<{ detection: faceapi.FaceDetection }>[] = [];
 
   for (const options of detectionOptions) {
     const result = await faceapi.detectAllFaces(img, options).withFaceLandmarks();
@@ -263,10 +263,6 @@ export async function analyzeFace(dataUrl: string): Promise<RealAnalysisResult> 
       detections = result;
       break;
     }
-  }
-
-  if (!detections) {
-    detections = [];
   }
 
   if (detections.length === 0) {
