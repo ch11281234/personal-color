@@ -1,8 +1,9 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { AlertCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/Layout";
-import { generateAnalysis } from "@/lib/analysis";
+import { analyzeFace, FaceAnalysisError, loadModels } from "@/lib/face-analyzer";
 import { loadImage, saveAnalysis } from "@/lib/analysis-store";
 
 export const Route = createFileRoute("/analyzing")({
@@ -11,11 +12,11 @@ export const Route = createFileRoute("/analyzing")({
 });
 
 const STAGES = [
+  "AI 모델 로딩 중...",
   "얼굴 랜드마크 검출 중...",
-  "피부 톤 샘플링 중...",
-  "골격 비율 분석 중...",
+  "피부 픽셀 샘플링 중...",
+  "얼굴 비율 계산 중...",
   "퍼스널 컬러 매칭 중...",
-  "스타일 추천 생성 중...",
 ];
 
 function AnalyzingPage() {
@@ -23,8 +24,13 @@ function AnalyzingPage() {
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState(0);
   const [image, setImage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const ranRef = useRef(false);
 
   useEffect(() => {
+    if (ranRef.current) return;
+    ranRef.current = true;
+
     const img = loadImage();
     if (!img) {
       navigate({ to: "/analyze" });
@@ -32,20 +38,41 @@ function AnalyzingPage() {
     }
     setImage(img);
 
-    const total = 3200;
-    const start = Date.now();
+    let cancelled = false;
+    let p = 0;
     const tick = setInterval(() => {
-      const p = Math.min(100, ((Date.now() - start) / total) * 100);
-      setProgress(p);
-      setStage(Math.min(STAGES.length - 1, Math.floor((p / 100) * STAGES.length)));
-      if (p >= 100) {
-        clearInterval(tick);
-        const result = generateAnalysis(img);
-        saveAnalysis(result);
-        setTimeout(() => navigate({ to: "/result" }), 300);
+      // ease toward 95 while waiting on real work
+      p = Math.min(95, p + (95 - p) * 0.06 + 0.5);
+      if (!cancelled) {
+        setProgress(p);
+        setStage(Math.min(STAGES.length - 1, Math.floor((p / 100) * STAGES.length)));
       }
-    }, 60);
-    return () => clearInterval(tick);
+    }, 100);
+
+    (async () => {
+      try {
+        await loadModels();
+        const result = await analyzeFace(img);
+        if (cancelled) return;
+        saveAnalysis(result);
+        clearInterval(tick);
+        setProgress(100);
+        setStage(STAGES.length - 1);
+        setTimeout(() => navigate({ to: "/result" }), 400);
+      } catch (e) {
+        if (cancelled) return;
+        clearInterval(tick);
+        const msg = e instanceof FaceAnalysisError
+          ? e.message
+          : e instanceof Error ? e.message : "분석 중 오류가 발생했습니다.";
+        setError(msg);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      clearInterval(tick);
+    };
   }, [navigate]);
 
   const r = 88;
@@ -74,7 +101,7 @@ function AnalyzingPage() {
               cx="100" cy="100" r={r} fill="none"
               stroke="url(#g)" strokeWidth="4" strokeLinecap="round"
               strokeDasharray={c} strokeDashoffset={offset}
-              style={{ transition: "stroke-dashoffset 0.1s linear" }}
+              style={{ transition: "stroke-dashoffset 0.2s linear" }}
             />
             <defs>
               <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
@@ -85,23 +112,38 @@ function AnalyzingPage() {
           </svg>
         </div>
 
-        <div className="mt-8 font-mono text-2xl font-bold text-gradient">
-          {Math.floor(progress)}%
-        </div>
-        <motion.p
-          key={stage}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-2 text-sm text-muted-foreground"
-        >
-          {STAGES[stage]}
-        </motion.p>
+        {error ? (
+          <div className="mx-auto mt-10 max-w-md rounded-2xl border border-destructive/40 bg-destructive/5 p-5 text-left">
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              <span className="text-sm font-semibold">분석 실패</span>
+            </div>
+            <p className="mt-2 text-sm text-foreground">{error}</p>
+            <Link to="/analyze" className="mt-4 inline-flex items-center justify-center rounded-full bg-gradient-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-glow">
+              다시 시도하기
+            </Link>
+          </div>
+        ) : (
+          <>
+            <div className="mt-8 font-mono text-2xl font-bold text-gradient">
+              {Math.floor(progress)}%
+            </div>
+            <motion.p
+              key={stage}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-2 text-sm text-muted-foreground"
+            >
+              {STAGES[stage]}
+            </motion.p>
 
-        <div className="mx-auto mt-10 grid max-w-md grid-cols-3 gap-2 text-xs text-muted-foreground">
-          <Metric label="Landmarks" value="128" />
-          <Metric label="Tone Bands" value="32" />
-          <Metric label="Models" value="4" />
-        </div>
+            <div className="mx-auto mt-10 grid max-w-md grid-cols-3 gap-2 text-xs text-muted-foreground">
+              <Metric label="Landmarks" value="68" />
+              <Metric label="Skin px" value="∼2k" />
+              <Metric label="Models" value="2" />
+            </div>
+          </>
+        )}
       </section>
     </Layout>
   );
