@@ -13,7 +13,7 @@ export const Route = createFileRoute("/result")({
 
 function ResultPage() {
   const navigate = useNavigate();
-  const [data, setData] = useState<AnalysisResult | null>(null);
+  const [data, setData] = useState<RealAnalysisResult | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
