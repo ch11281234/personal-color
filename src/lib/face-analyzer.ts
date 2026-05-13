@@ -1,7 +1,7 @@
 import * as faceapi from "face-api.js";
 import { FACE_SHAPES, PERSONAL_COLORS, type AnalysisResult } from "./analysis";
 
-const MODEL_URL = "https://justadudewhohacks.github.io/face-api.js/models";
+const MODEL_URL = "/models";
 
 let modelsLoaded = false;
 let loadPromise: Promise<void> | null = null;
@@ -10,11 +10,16 @@ export async function loadModels(): Promise<void> {
   if (modelsLoaded) return;
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-    ]);
-    modelsLoaded = true;
+    try {
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      ]);
+      modelsLoaded = true;
+    } catch (error) {
+      loadPromise = null;
+      throw new FaceAnalysisError("load-failed", "AI 분석 모델을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
+    }
   })();
   return loadPromise;
 }
@@ -244,9 +249,25 @@ export async function analyzeFace(dataUrl: string): Promise<RealAnalysisResult> 
   await loadModels();
   const img = await loadImage(dataUrl);
 
-  const detections = await faceapi
-    .detectAllFaces(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }))
-    .withFaceLandmarks();
+  const detectionOptions = [
+    new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.3 }),
+    new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.25 }),
+    new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.2 }),
+  ];
+
+  let detections: Awaited<ReturnType<typeof faceapi.detectAllFaces>> | null = null;
+
+  for (const options of detectionOptions) {
+    const result = await faceapi.detectAllFaces(img, options).withFaceLandmarks();
+    if (result.length > 0) {
+      detections = result;
+      break;
+    }
+  }
+
+  if (!detections) {
+    detections = [];
+  }
 
   if (detections.length === 0) {
     throw new FaceAnalysisError("no-face", "얼굴을 찾지 못했습니다. 정면 사진을 업로드해주세요.");
@@ -263,7 +284,7 @@ export async function analyzeFace(dataUrl: string): Promise<RealAnalysisResult> 
   const jawMidX = (jawLeft.x + jawRight.x) / 2;
   const jawWidth = Math.abs(jawRight.x - jawLeft.x);
   const offset = Math.abs(nose.x - jawMidX) / jawWidth;
-  if (offset > 0.12) {
+  if (offset > 0.2) {
     throw new FaceAnalysisError("not-frontal", "정면 각도가 아닙니다. 정면을 바라보는 사진을 사용해주세요.");
   }
 
@@ -274,7 +295,7 @@ export async function analyzeFace(dataUrl: string): Promise<RealAnalysisResult> 
   // confidence: face-api detector score + sample count quality
   const detScore = det.detection.score; // 0..1
   const sampleQ = Math.min(1, skin.sampleCount / 1500);
-  const frontalQ = 1 - offset / 0.12;
+  const frontalQ = Math.max(0, 1 - offset / 0.2);
   const confidence = Math.round((detScore * 0.5 + sampleQ * 0.25 + frontalQ * 0.25) * 100);
 
   return {
