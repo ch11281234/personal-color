@@ -42,3 +42,20 @@ export function loadImage(): string | null {
   if (image) memoryImage = image;
   return image;
 }
+
+export function saveGender(g: Gender) {
+  memoryGender = g;
+  if (typeof window === "undefined") return;
+  try { sessionStorage.setItem(GENDER_KEY, g); } catch {}
+}
+
+export function loadGender(): Gender | null {
+  if (memoryGender) return memoryGender;
+  if (typeof window === "undefined") return null;
+  const g = sessionStorage.getItem(GENDER_KEY) as Gender | null;
+  if (g === "male" || g === "female") {
+    memoryGender = g;
+    return g;
+  }
+  return null;
+}
