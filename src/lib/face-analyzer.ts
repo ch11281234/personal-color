@@ -252,6 +252,7 @@ function classifyPersonalColor(skin: ReturnType<typeof analyzeSkin>) {
 }
 
 export type RealAnalysisResult = AnalysisResult & {
+  gender: Gender;
   reasons: { color: string; shape: string };
   skin: { r: number; g: number; b: number; warmth: number; brightness: number; saturation: number };
   metrics: {
@@ -261,10 +262,20 @@ export type RealAnalysisResult = AnalysisResult & {
     foreheadWidth: number;
     lengthRatio: number;
     jawAngleDeg: number;
+    foreheadJaw: number;
+    jawCheek: number;
+    facialIndex: number;
   };
+  facialIndex: number;
+  koreanShape: KoreanFaceShape;
+  hairRecommendation: string;
+  glassesRecommendation: string;
 };
 
-export async function analyzeFace(dataUrl: string): Promise<RealAnalysisResult> {
+export async function analyzeFace(
+  dataUrl: string,
+  gender: Gender = "male"
+): Promise<RealAnalysisResult> {
   await loadModels();
   const img = await loadImage(dataUrl);
 
@@ -294,31 +305,34 @@ export async function analyzeFace(dataUrl: string): Promise<RealAnalysisResult> 
   const det = detections[0];
   const points: Point[] = det.landmarks.positions.map((p) => ({ x: p.x, y: p.y }));
 
-  // frontal check: nose tip (30) should be near horizontal center of jaw (0..16)
   const jawLeft = points[0], jawRight = points[16], nose = points[30];
   const jawMidX = (jawLeft.x + jawRight.x) / 2;
-  const jawWidth = Math.abs(jawRight.x - jawLeft.x);
-  const offset = Math.abs(nose.x - jawMidX) / jawWidth;
+  const jawWidthPx = Math.abs(jawRight.x - jawLeft.x);
+  const offset = Math.abs(nose.x - jawMidX) / jawWidthPx;
   if (offset > 0.2) {
     throw new FaceAnalysisError("not-frontal", "얼굴이 너무 옆으로 돌아가 있습니다. 카메라를 정면으로 보고 다시 촬영해주세요.");
   }
 
-  const { shape, reason: shapeReason, metrics } = classifyFaceShape(points);
+  const { shape, reason: shapeReason, metrics, facialIndex } = classifyFaceShape(points);
+  const koreanShape = classifyKoreanShape(facialIndex);
+  const legacyId = toLegacyShapeId(koreanShape.id);
+  const finalShape = FACE_SHAPES.find((s) => s.id === legacyId) ?? shape;
+
   const skin = analyzeSkin(img, points);
   const { pc, reason: colorReason } = classifyPersonalColor(skin);
 
-  // confidence: face-api detector score + sample count quality
-  const detScore = det.detection.score; // 0..1
+  const detScore = det.detection.score;
   const sampleQ = Math.min(1, skin.sampleCount / 1500);
   const frontalQ = Math.max(0, 1 - offset / 0.2);
   const confidence = Math.round((detScore * 0.5 + sampleQ * 0.25 + frontalQ * 0.25) * 100);
 
   return {
     personalColor: pc,
-    faceShape: shape,
+    faceShape: finalShape,
     confidence: Math.max(70, Math.min(99, confidence)),
     imageUrl: dataUrl,
     analyzedAt: new Date().toISOString(),
+    gender,
     reasons: { color: colorReason, shape: shapeReason },
     skin: {
       r: Math.round(skin.r),
@@ -329,5 +343,9 @@ export async function analyzeFace(dataUrl: string): Promise<RealAnalysisResult> 
       saturation: +skin.s.toFixed(3),
     },
     metrics,
+    facialIndex: +facialIndex.toFixed(1),
+    koreanShape,
+    hairRecommendation: koreanShape.hair[gender],
+    glassesRecommendation: koreanShape.glasses[gender],
   };
 }
