@@ -1,9 +1,12 @@
 import type { RealAnalysisResult } from "./face-analyzer";
+import type { Gender } from "./hair-recommendations";
 
 const KEY = "isaac:last-analysis";
 const IMG_KEY = "isaac:last-image";
+const GENDER_KEY = "isaac:last-gender";
 let memoryAnalysis: RealAnalysisResult | null = null;
 let memoryImage: string | null = null;
+let memoryGender: Gender | null = null;
 
 export function saveAnalysis(result: RealAnalysisResult) {
   memoryAnalysis = result;
