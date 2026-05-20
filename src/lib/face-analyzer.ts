@@ -91,8 +91,8 @@ function classifyFaceShape(landmarks: Point[]) {
   const jawWidth = dist(leftJaw, rightJaw);
   const foreheadWidth = dist(browLeft, browRight);
 
-  const lengthRatio = faceLength / cheekWidth; // >1 longer
-  const jawCheek = jawWidth / cheekWidth; // ~1 square, <0.78 heart
+  const lengthRatio = faceLength / cheekWidth;
+  const jawCheek = jawWidth / cheekWidth;
   const foreheadJaw = foreheadWidth / jawWidth;
 
   // jaw angle: angle at point 5-8-11
@@ -106,29 +106,39 @@ function classifyFaceShape(landmarks: Point[]) {
       180) /
     Math.PI;
 
+  // Korean 안면지수 (facial index) — Python reference:
+  //   h = ||p[8] - p[27]||  (chin -> between-brows / nose root)
+  //   w = ||p[16] - p[0]||  (jaw width)
+  //   idx = (h / w) * 100
+  const noseRoot = landmarks[27];
+  const noseToChin = dist(noseRoot, chin);
+  const fullJawWidth = dist(landmarks[0], landmarks[16]);
+  const facialIndex = (noseToChin / fullJawWidth) * 100;
+
   let id: string;
   let reason: string;
-  if (lengthRatio > 1.45) {
+  if (facialIndex >= 95) {
     id = "long";
-    reason = `세로 비율 ${lengthRatio.toFixed(2)} — 광대보다 얼굴 길이가 매우 깁니다.`;
-  } else if (foreheadJaw > 1.15 && jawCheek < 0.85) {
-    id = "square"; // map heart -> square not in list; fall back to square if no heart
-    reason = `이마 너비가 턱보다 ${((foreheadJaw - 1) * 100).toFixed(0)}% 넓고 턱이 좁습니다.`;
-  } else if (jawAngleDeg < 110 && jawCheek > 0.88) {
-    id = "square";
-    reason = `턱 각도 ${jawAngleDeg.toFixed(0)}°로 또렷하고 턱 너비가 넓습니다.`;
-  } else if (lengthRatio < 1.15 && jawAngleDeg > 120) {
-    id = "round";
-    reason = `가로:세로 비율이 ${lengthRatio.toFixed(2)}로 비슷하고 턱선이 둥급니다.`;
-  } else {
+    reason = `안면지수 ${facialIndex.toFixed(1)} — 세로가 가로보다 매우 깁니다 (초장안).`;
+  } else if (facialIndex >= 90) {
+    id = "long";
+    reason = `안면지수 ${facialIndex.toFixed(1)} — 세로 비율이 긴 편입니다 (장안).`;
+  } else if (facialIndex >= 85) {
     id = "oval";
-    reason = `세로 비율 ${lengthRatio.toFixed(2)}, 턱 각도 ${jawAngleDeg.toFixed(0)}°로 균형 잡힌 비율입니다.`;
+    reason = `안면지수 ${facialIndex.toFixed(1)} — 황금비에 가까운 균형 잡힌 비율입니다 (중안/계란형).`;
+  } else if (facialIndex >= 80) {
+    id = "round";
+    reason = `안면지수 ${facialIndex.toFixed(1)} — 가로 폭이 넓고 턱선이 둥급니다 (단안).`;
+  } else {
+    id = "square";
+    reason = `안면지수 ${facialIndex.toFixed(1)} — 가로 폭이 매우 넓고 턱이 또렷합니다 (초단안/각진형).`;
   }
 
   const shape = FACE_SHAPES.find((s) => s.id === id) ?? FACE_SHAPES[0];
   return {
     shape,
     reason,
+    facialIndex,
     metrics: {
       faceLength: Math.round(faceLength),
       cheekWidth: Math.round(cheekWidth),
@@ -136,6 +146,9 @@ function classifyFaceShape(landmarks: Point[]) {
       foreheadWidth: Math.round(foreheadWidth),
       lengthRatio: +lengthRatio.toFixed(2),
       jawAngleDeg: +jawAngleDeg.toFixed(1),
+      foreheadJaw: +foreheadJaw.toFixed(2),
+      jawCheek: +jawCheek.toFixed(2),
+      facialIndex: +facialIndex.toFixed(1),
     },
   };
 }
