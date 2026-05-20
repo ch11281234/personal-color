@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Camera, Image as ImageIcon, Sparkles, Upload, X } from "lucide-react";
+import { Camera, Image as ImageIcon, Sparkles, Upload, User, UserRound, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { Layout } from "@/components/Layout";
-import { saveImage } from "@/lib/analysis-store";
+import { saveGender, saveImage } from "@/lib/analysis-store";
+import type { Gender } from "@/lib/hair-recommendations";
 
 export const Route = createFileRoute("/analyze")({
   head: () => ({
@@ -17,6 +18,7 @@ export const Route = createFileRoute("/analyze")({
 
 function AnalyzePage() {
   const [preview, setPreview] = useState<string | null>(null);
+  const [gender, setGender] = useState<Gender | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -30,8 +32,9 @@ function AnalyzePage() {
   };
 
   const startAnalysis = () => {
-    if (!preview) return;
+    if (!preview || !gender) return;
     saveImage(preview);
+    saveGender(gender);
     navigate({ to: "/analyzing" });
   };
 
