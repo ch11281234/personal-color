@@ -52,7 +52,7 @@ function AnalyzingPage() {
       try {
         const { analyzeFace, loadModels } = await import("@/lib/face-analyzer");
         await loadModels();
-        const result = await analyzeFace(img);
+        const result = await analyzeFace(img, loadGender() ?? "male");
         if (cancelled) return;
         saveAnalysis(result);
         clearInterval(tick);
