@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { AlertCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/Layout";
-import { loadImage, saveAnalysis } from "@/lib/analysis-store";
+import { loadGender, loadImage, saveAnalysis } from "@/lib/analysis-store";
 
 export const Route = createFileRoute("/analyzing")({
   head: () => ({ meta: [{ title: "분석 중 — ISAAC AI" }] }),
@@ -52,7 +52,7 @@ function AnalyzingPage() {
       try {
         const { analyzeFace, loadModels } = await import("@/lib/face-analyzer");
         await loadModels();
-        const result = await analyzeFace(img);
+        const result = await analyzeFace(img, loadGender() ?? "male");
         if (cancelled) return;
         saveAnalysis(result);
         clearInterval(tick);

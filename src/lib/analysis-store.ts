@@ -1,9 +1,12 @@
 import type { RealAnalysisResult } from "./face-analyzer";
+import type { Gender } from "./hair-recommendations";
 
 const KEY = "isaac:last-analysis";
 const IMG_KEY = "isaac:last-image";
+const GENDER_KEY = "isaac:last-gender";
 let memoryAnalysis: RealAnalysisResult | null = null;
 let memoryImage: string | null = null;
+let memoryGender: Gender | null = null;
 
 export function saveAnalysis(result: RealAnalysisResult) {
   memoryAnalysis = result;
@@ -38,4 +41,21 @@ export function loadImage(): string | null {
   const image = sessionStorage.getItem(IMG_KEY);
   if (image) memoryImage = image;
   return image;
+}
+
+export function saveGender(g: Gender) {
+  memoryGender = g;
+  if (typeof window === "undefined") return;
+  try { sessionStorage.setItem(GENDER_KEY, g); } catch {}
+}
+
+export function loadGender(): Gender | null {
+  if (memoryGender) return memoryGender;
+  if (typeof window === "undefined") return null;
+  const g = sessionStorage.getItem(GENDER_KEY) as Gender | null;
+  if (g === "male" || g === "female") {
+    memoryGender = g;
+    return g;
+  }
+  return null;
 }

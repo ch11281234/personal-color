@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Camera, Image as ImageIcon, Sparkles, Upload, X } from "lucide-react";
+import { Camera, Image as ImageIcon, Sparkles, Upload, User, UserRound, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { Layout } from "@/components/Layout";
-import { saveImage } from "@/lib/analysis-store";
+import { saveGender, saveImage } from "@/lib/analysis-store";
+import type { Gender } from "@/lib/hair-recommendations";
 
 export const Route = createFileRoute("/analyze")({
   head: () => ({
@@ -17,6 +18,7 @@ export const Route = createFileRoute("/analyze")({
 
 function AnalyzePage() {
   const [preview, setPreview] = useState<string | null>(null);
+  const [gender, setGender] = useState<Gender | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -30,8 +32,9 @@ function AnalyzePage() {
   };
 
   const startAnalysis = () => {
-    if (!preview) return;
+    if (!preview || !gender) return;
     saveImage(preview);
+    saveGender(gender);
     navigate({ to: "/analyzing" });
   };
 
@@ -128,15 +131,47 @@ function AnalyzePage() {
             <Tip text="필터·메이크업 최소화" />
           </div>
 
+          <div className="mt-10">
+            <p className="text-center text-xs font-mono uppercase tracking-widest text-primary">Step 02 · 성별 선택</p>
+            <p className="mt-1 text-center text-sm text-muted-foreground">성별에 맞춘 헤어/안경 추천을 제공합니다.</p>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:max-w-md sm:mx-auto">
+              <button
+                onClick={() => setGender("male")}
+                className={`group flex flex-col items-center gap-2 rounded-2xl border-2 px-4 py-5 transition-all ${
+                  gender === "male"
+                    ? "border-primary bg-primary/10 shadow-glow"
+                    : "border-border bg-card hover:border-primary/40"
+                }`}
+              >
+                <User className={`h-7 w-7 ${gender === "male" ? "text-primary" : "text-muted-foreground"}`} />
+                <span className="text-sm font-semibold">남성 (Male)</span>
+              </button>
+              <button
+                onClick={() => setGender("female")}
+                className={`group flex flex-col items-center gap-2 rounded-2xl border-2 px-4 py-5 transition-all ${
+                  gender === "female"
+                    ? "border-primary bg-primary/10 shadow-glow"
+                    : "border-border bg-card hover:border-primary/40"
+                }`}
+              >
+                <UserRound className={`h-7 w-7 ${gender === "female" ? "text-primary" : "text-muted-foreground"}`} />
+                <span className="text-sm font-semibold">여성 (Female)</span>
+              </button>
+            </div>
+          </div>
+
           <div className="mt-10 flex flex-col items-center gap-3">
             <button
-              disabled={!preview}
+              disabled={!preview || !gender}
               onClick={startAnalysis}
               className="group inline-flex items-center gap-2 rounded-full bg-gradient-primary px-8 py-3.5 text-sm font-semibold text-primary-foreground shadow-glow transition-all enabled:hover:scale-[1.03] disabled:opacity-40"
             >
               <Sparkles className="h-4 w-4" />
               AI 분석 시작
             </button>
+            {!gender && preview && (
+              <p className="text-xs text-muted-foreground">성별을 선택해주세요</p>
+            )}
             <Link to="/" className="text-xs text-muted-foreground hover:text-foreground">
               ← 홈으로 돌아가기
             </Link>
