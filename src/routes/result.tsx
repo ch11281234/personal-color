@@ -187,25 +187,56 @@ function ResultPage() {
               className="rounded-3xl border border-border bg-card p-7 shadow-elegant"
             >
               <div className="flex items-center justify-between">
-                <span className="font-mono text-xs uppercase tracking-widest text-primary">Face Shape</span>
+                <span className="font-mono text-xs uppercase tracking-widest text-primary">Face Shape · {data.gender === "male" ? "남성" : "여성"}</span>
                 <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                  {fs.id}
+                  {data.koreanShape.id}
                 </span>
               </div>
-              <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">{fs.name}</h2>
+              <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">{data.koreanShape.name}</h2>
+              <p className="mt-1 font-mono text-xs text-muted-foreground">{data.koreanShape.range}</p>
               <p className="mt-2 text-sm text-muted-foreground">{fs.description}</p>
               <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
                 <span className="font-mono text-primary">AI 근거 · </span>{data.reasons.shape}
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 text-center font-mono text-[10px] text-muted-foreground">
+
+              {/* Facial Index gauge */}
+              <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold uppercase tracking-wider text-muted-foreground">안면지수 (Facial Index)</span>
+                  <span className="font-mono text-lg font-bold text-gradient">{data.facialIndex}</span>
+                </div>
+                <div className="relative mt-3 h-2 overflow-hidden rounded-full bg-secondary">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-emerald-400 to-rose-500 opacity-30" />
+                  <motion.div
+                    initial={{ left: "0%" }}
+                    animate={{ left: `${Math.min(100, Math.max(0, ((data.facialIndex - 75) / 25) * 100))}%` }}
+                    transition={{ duration: 0.8 }}
+                    className="absolute top-1/2 h-4 w-1 -translate-x-1/2 -translate-y-1/2 rounded bg-primary shadow-glow"
+                  />
+                </div>
+                <div className="mt-1 flex justify-between font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                  <span>75 초단안</span><span>85 중안</span><span>100 초장안</span>
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-4 gap-2 text-center font-mono text-[10px] text-muted-foreground">
+                <Stat label="Index" value={data.facialIndex.toString()} />
                 <Stat label="L/W" value={data.metrics.lengthRatio.toString()} />
                 <Stat label="Jaw°" value={data.metrics.jawAngleDeg.toString()} />
                 <Stat label="Cheek" value={`${data.metrics.cheekWidth}px`} />
               </div>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <RecBox title="추천 헤어스타일" items={fs.hair} />
-                <RecBox title="추천 안경" items={fs.glasses} />
+                <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+                    추천 헤어스타일 · {data.gender === "male" ? "남성" : "여성"}
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed">{data.hairRecommendation}</p>
+                </div>
+                <div className="rounded-2xl border border-border bg-surface p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">추천 안경</p>
+                  <p className="mt-2 text-sm leading-relaxed">{data.glassesRecommendation}</p>
+                </div>
               </div>
             </motion.div>
           </div>
