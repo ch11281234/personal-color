@@ -1,5 +1,11 @@
 import * as faceapi from "face-api.js";
 import { FACE_SHAPES, PERSONAL_COLORS, type AnalysisResult } from "./analysis";
+import {
+  classifyKoreanShape,
+  toLegacyShapeId,
+  type Gender,
+  type KoreanFaceShape,
+} from "./hair-recommendations";
 
 const MODEL_URL = "/models";
 
