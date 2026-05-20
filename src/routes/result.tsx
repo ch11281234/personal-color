@@ -246,21 +246,6 @@ function ResultPage() {
   );
 }
 
-function RecBox({ title, items }: { title: string; items: string[] }) {
-  return (
-    <div className="rounded-2xl border border-border bg-surface p-4">
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</p>
-      <ul className="mt-2 space-y-1.5 text-sm">
-        {items.map((i) => (
-          <li key={i} className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" /> {i}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-border bg-surface px-2 py-1.5">
