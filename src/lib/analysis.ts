@@ -1,12 +1,21 @@
+export type PersonalColorId =
+  | "spring-light" | "spring-warm" | "spring-clear"
+  | "summer-light" | "summer-cool" | "summer-soft"
+  | "autumn-soft" | "autumn-warm" | "autumn-deep"
+  | "winter-cool" | "winter-deep" | "winter-clear";
+
 export type PersonalColor = {
-  id: string;
+  id: PersonalColorId | string;
   name: string;
   season: "spring" | "summer" | "autumn" | "winter";
   tone: "warm" | "cool";
+  dominant: "light" | "deep" | "warm" | "cool" | "soft" | "clear";
   description: string;
   palette: string[];
   fashion: string[];
+  avoid: string[];
   makeup: { lip: string; cheek: string; eye: string };
+  metals: string[];
 };
 
 export type FaceShape = {
@@ -19,96 +28,25 @@ export type FaceShape = {
 
 export const PERSONAL_COLORS: PersonalColor[] = [
   {
-    id: "spring-warm",
-    name: "봄 웜톤 (Spring Warm)",
-    season: "spring",
-    tone: "warm",
-    description: "맑고 화사한 피부톤. 따뜻하고 밝은 컬러가 잘 어울립니다.",
+    id: "spring-light", name: "봄 라이트 (Light Spring)", season: "spring", tone: "warm", dominant: "light",
+    description: "밝고 가벼운 따뜻함. 파스텔 톤의 웜이 가장 잘 어울립니다.",
+    palette: ["#FFE5B4", "#FFD1A9", "#FFE7E1", "#F8E5A1", "#C8E6C9", "#FFC9A8"],
+    fashion: ["아이보리", "라이트 피치", "샴페인", "민트"],
+    avoid: ["블랙", "버건디", "차콜"],
+    makeup: { lip: "피치 누드", cheek: "샤벳 피치", eye: "샴페인 골드" },
+    metals: ["로즈골드", "샴페인 골드"],
+  },
+  {
+    id: "spring-warm", name: "봄 웜 (Warm Spring)", season: "spring", tone: "warm", dominant: "warm",
+    description: "따뜻함이 가장 강한 타입. 황금빛 코랄과 옐로우가 매력 포인트.",
     palette: ["#FFB347", "#FFD27F", "#F8C8DC", "#A8E6A1", "#FFE066", "#FF8C66"],
-    fashion: ["코랄", "아이보리", "라이트 카멜", "피치"],
+    fashion: ["코랄", "골든 옐로우", "라이트 카멜", "피치"],
+    avoid: ["블루베이스 핑크", "퓨어 화이트"],
     makeup: { lip: "코랄 핑크", cheek: "피치 살구", eye: "골드 브라운" },
+    metals: ["옐로우 골드", "브론즈"],
   },
   {
-    id: "summer-cool",
-    name: "여름 쿨톤 (Summer Cool)",
-    season: "summer",
-    tone: "cool",
-    description: "부드럽고 시원한 피부톤. 파스텔과 라벤더가 매력을 살려줍니다.",
-    palette: ["#A7C7E7", "#C9B6E4", "#F4B6C2", "#B5EAD7", "#E0BBE4", "#9BB7D4"],
-    fashion: ["스카이 블루", "라벤더", "로즈 핑크", "민트"],
-    makeup: { lip: "로즈 핑크", cheek: "쿨 핑크", eye: "라벤더 그레이" },
-  },
-  {
-    id: "autumn-warm",
-    name: "가을 웜톤 (Autumn Warm)",
-    season: "autumn",
-    tone: "warm",
-    description: "차분하고 깊이 있는 피부톤. 머스타드, 카멜이 고급스럽게 어울립니다.",
-    palette: ["#B5651D", "#8B5E3C", "#C68642", "#556B2F", "#D2691E", "#A0522D"],
-    fashion: ["카멜", "머스타드", "올리브", "버건디"],
-    makeup: { lip: "벽돌 레드", cheek: "테라코타", eye: "카퍼 브라운" },
-  },
-  {
-    id: "winter-cool",
-    name: "겨울 쿨톤 (Winter Cool)",
-    season: "winter",
-    tone: "cool",
-    description: "선명하고 차가운 피부톤. 강한 대비의 컬러가 시크하게 어울립니다.",
-    palette: ["#0F1A2B", "#FFFFFF", "#C8102E", "#1F4E79", "#6F2DA8", "#E60073"],
-    fashion: ["블랙", "퓨어 화이트", "딥 네이비", "푸시아"],
-    makeup: { lip: "체리 레드", cheek: "쿨 로즈", eye: "스모키 그레이" },
-  },
-];
-
-export const FACE_SHAPES: FaceShape[] = [
-  {
-    id: "oval",
-    name: "계란형",
-    description: "이상적인 비율의 얼굴형. 대부분의 스타일이 잘 어울립니다.",
-    hair: ["롱 레이어드", "사이드 파트", "자연스러운 웨이브"],
-    glasses: ["라운드", "웰링턴", "스퀘어"],
-  },
-  {
-    id: "round",
-    name: "둥근형",
-    description: "부드럽고 친근한 인상. 세로 라인을 강조하면 좋습니다.",
-    hair: ["롱 스트레이트", "사이드 뱅", "하이 포니테일"],
-    glasses: ["스퀘어", "직사각형", "각진 프레임"],
-  },
-  {
-    id: "square",
-    name: "각진형",
-    description: "또렷하고 강한 인상. 곡선 라인으로 부드럽게 보완하면 좋습니다.",
-    hair: ["사이드 파트 웨이브", "롱 보브", "C컬"],
-    glasses: ["라운드", "오벌", "캣아이"],
-  },
-  {
-    id: "long",
-    name: "긴형",
-    description: "세련되고 성숙한 인상. 가로 볼륨이 중요합니다.",
-    hair: ["풀 뱅", "숄더 보브", "볼륨 펌"],
-    glasses: ["오버사이즈", "두꺼운 프레임", "에비에이터"],
-  },
-];
-
-export type AnalysisResult = {
-  personalColor: PersonalColor;
-  faceShape: FaceShape;
-  confidence: number;
-  imageUrl: string;
-  analyzedAt: string;
-};
-
-export function pickRandom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-export function generateAnalysis(imageUrl: string): AnalysisResult {
-  return {
-    personalColor: pickRandom(PERSONAL_COLORS),
-    faceShape: pickRandom(FACE_SHAPES),
-    confidence: 87 + Math.floor(Math.random() * 11),
-    imageUrl,
-    analyzedAt: new Date().toISOString(),
-  };
-}
+    id: "spring-clear", name: "봄 클리어 (Clear Spring)", season: "spring", tone: "warm", dominant: "clear",
+    description: "선명한 채도와 밝은 명도. 비비드한 웜 컬러가 화사하게 어울립니다.",
+    palette: ["#FF6F61", "#FFD400", "#00B894", "#FF8FA3", "#FFA500", "#48D1CC"],
+    fashion: ["비비드 코랄", "에메랄드", "선플라
