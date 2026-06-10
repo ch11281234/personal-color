@@ -11,6 +11,21 @@ export const Route = createFileRoute("/result")({
   component: ResultPage,
 });
 
+const REGION_LABEL: Record<string, string> = {
+  forehead: "이마",
+  leftCheek: "왼쪽 볼",
+  rightCheek: "오른쪽 볼",
+  noseBridge: "콧등",
+  chin: "턱",
+};
+
+const SEASON_LABEL: Record<string, string> = {
+  spring: "봄",
+  summer: "여름",
+  autumn: "가을",
+  winter: "겨울",
+};
+
 function ResultPage() {
   const navigate = useNavigate();
   const [data, setData] = useState<RealAnalysisResult | null>(null);
@@ -40,6 +55,9 @@ function ResultPage() {
     a.download = `isaac-ai-${pc.id}.png`;
     a.click();
   };
+
+  const topProbs = data.probabilities.slice(0, 4);
+  const seasonProbs = [...data.seasonProbabilities].sort((a, b) => b.prob - a.prob);
 
   return (
     <Layout>
@@ -72,7 +90,7 @@ function ResultPage() {
         </motion.div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1.4fr]">
-          {/* Left: photo + confidence */}
+          {/* Left: photo + measurements */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -99,24 +117,68 @@ function ResultPage() {
                 />
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                얼굴 랜드마크 68점과 피부 픽셀 샘플을 종합한 분석 정확도입니다.
+                얼굴 랜드마크 68점 · 5개 피부 영역 LAB 측정 · Gray-world 조명 보정을 종합한 정확도입니다.
               </p>
             </div>
 
-            {/* Skin RGB swatch */}
+            {/* Skin (calibrated) */}
             <div className="mt-5 rounded-2xl border border-border bg-surface p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">측정된 피부톤</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">측정된 피부톤 (조명 보정 후)</p>
               <div className="mt-2 flex items-center gap-3">
                 <div
                   className="h-12 w-12 rounded-xl border border-border shadow-elegant"
                   style={{ background: `rgb(${data.skin.r}, ${data.skin.g}, ${data.skin.b})` }}
                 />
-                <div className="font-mono text-xs text-muted-foreground">
+                <div className="font-mono text-[11px] leading-relaxed text-muted-foreground">
                   <p>RGB({data.skin.r}, {data.skin.g}, {data.skin.b})</p>
-                  <p>Warmth {data.skin.warmth} · Bright {(data.skin.brightness * 100).toFixed(0)}% · Sat {(data.skin.saturation * 100).toFixed(0)}%</p>
+                  <p>LAB L*{data.skin.L} a*{data.skin.a} b*{data.skin.bAxis} · Chroma {data.skin.chroma}</p>
+                  <p>Warmth {data.skin.warmth} · WB gain {data.whiteBalanceGains.r}/{data.whiteBalanceGains.g}/{data.whiteBalanceGains.b}</p>
                 </div>
               </div>
             </div>
+
+            {/* Region swatches */}
+            <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">영역별 피부 측정값</p>
+              <div className="mt-3 grid grid-cols-5 gap-2">
+                {data.regions.map((rg) => (
+                  <div key={rg.region} className="text-center">
+                    <div
+                      className="aspect-square w-full rounded-lg border border-border shadow-elegant"
+                      style={{ background: `rgb(${rg.r}, ${rg.g}, ${rg.b})` }}
+                      title={`L*${rg.L} a*${rg.a} b*${rg.bAxis}`}
+                    />
+                    <p className="mt-1 text-[10px] text-muted-foreground">{REGION_LABEL[rg.region]}</p>
+                    <p className="font-mono text-[9px] text-muted-foreground">L{Math.round(rg.L)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Contrast / Hair */}
+            {data.hair && (
+              <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">피부–머리카락 대비</p>
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="flex">
+                    <div className="h-10 w-10 rounded-l-lg border border-border" style={{ background: `rgb(${data.skin.r}, ${data.skin.g}, ${data.skin.b})` }} />
+                    <div className="h-10 w-10 rounded-r-lg border border-l-0 border-border" style={{ background: `rgb(${data.hair.r}, ${data.hair.g}, ${data.hair.b})` }} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">ΔL*</span>
+                      <span className="font-mono font-bold text-primary">{data.contrast}</span>
+                    </div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
+                      <div className="h-full rounded-full bg-gradient-primary" style={{ width: `${Math.min(100, (data.contrast / 60) * 100)}%` }} />
+                    </div>
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      {data.contrast > 35 ? "강한 대비 (Clear/Deep 계열)" : data.contrast < 20 ? "낮은 대비 (Soft 계열)" : "중간 대비"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <Link
               to="/analyze"
@@ -136,15 +198,49 @@ function ResultPage() {
               className="rounded-3xl border border-border bg-card p-7 shadow-elegant"
             >
               <div className="flex items-center justify-between">
-                <span className="font-mono text-xs uppercase tracking-widest text-primary">Personal Color</span>
+                <span className="font-mono text-xs uppercase tracking-widest text-primary">Personal Color · 12-type</span>
                 <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary capitalize">
-                  {pc.tone} tone
+                  {pc.tone} · {pc.dominant}
                 </span>
               </div>
               <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">{pc.name}</h2>
               <p className="mt-2 text-sm text-muted-foreground">{pc.description}</p>
               <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
                 <span className="font-mono text-primary">AI 근거 · </span>{data.reasons.color}
+              </div>
+
+              {/* Season probabilities */}
+              <div className="mt-5">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">계절 확률 분포</p>
+                <div className="space-y-1.5">
+                  {seasonProbs.map((s) => (
+                    <div key={s.season} className="flex items-center gap-2 text-xs">
+                      <span className="w-10 text-muted-foreground">{SEASON_LABEL[s.season] ?? s.season}</span>
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${s.prob * 100}%` }}
+                          transition={{ duration: 0.8 }}
+                          className="h-full rounded-full bg-gradient-primary"
+                        />
+                      </div>
+                      <span className="w-10 text-right font-mono font-bold text-primary">{(s.prob * 100).toFixed(0)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Top sub-types */}
+              <div className="mt-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Top 4 세부 유형</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {topProbs.map((t, i) => (
+                    <div key={t.id} className={`flex items-center justify-between rounded-lg border px-2 py-1.5 text-[11px] ${i === 0 ? "border-primary/40 bg-primary/5" : "border-border bg-surface"}`}>
+                      <span className="truncate">{t.name}</span>
+                      <span className="ml-2 shrink-0 font-mono font-bold text-primary">{(t.prob * 100).toFixed(0)}%</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="mt-5">
@@ -161,10 +257,18 @@ function ResultPage() {
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">패션</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">패션 컬러</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {pc.fashion.map((t: string) => (
                       <span key={t} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium">{t}</span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">메탈/액세서리</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {pc.metals.map((t: string) => (
+                      <span key={t} className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{t}</span>
                     ))}
                   </div>
                 </div>
@@ -175,6 +279,14 @@ function ResultPage() {
                     <li><span className="text-muted-foreground">치크</span> · {pc.makeup.cheek}</li>
                     <li><span className="text-muted-foreground">아이</span> · {pc.makeup.eye}</li>
                   </ul>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">피해야 할 컬러</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {pc.avoid.map((t: string) => (
+                      <span key={t} className="rounded-full border border-destructive/40 bg-destructive/5 px-2.5 py-1 text-xs text-destructive">{t}</span>
+                    ))}
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -192,7 +304,7 @@ function ResultPage() {
                   {data.koreanShape.id}
                 </span>
               </div>
-              <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">{data.koreanShape.name}</h2>
+              <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">{fs.name} · {data.koreanShape.name}</h2>
               <p className="mt-1 font-mono text-xs text-muted-foreground">{data.koreanShape.range}</p>
               <p className="mt-2 text-sm text-muted-foreground">{fs.description}</p>
               <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
@@ -223,6 +335,10 @@ function ResultPage() {
                 <Stat label="Index" value={data.facialIndex.toString()} />
                 <Stat label="L/W" value={data.metrics.lengthRatio.toString()} />
                 <Stat label="Jaw°" value={data.metrics.jawAngleDeg.toString()} />
+                <Stat label="Curve" value={data.metrics.jawCurvature.toString()} />
+                <Stat label="F/C" value={data.metrics.foreheadCheek.toString()} />
+                <Stat label="J/C" value={data.metrics.jawCheek.toString()} />
+                <Stat label="F/J" value={data.metrics.foreheadJaw.toString()} />
                 <Stat label="Cheek" value={`${data.metrics.cheekWidth}px`} />
               </div>
 
