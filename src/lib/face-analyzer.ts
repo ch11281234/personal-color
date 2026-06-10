@@ -1,5 +1,10 @@
 import * as faceapi from "face-api.js";
-import { FACE_SHAPES, PERSONAL_COLORS, type AnalysisResult } from "./analysis";
+import {
+  FACE_SHAPES,
+  PERSONAL_COLORS,
+  type AnalysisResult,
+  type PersonalColor,
+} from "./analysis";
 import {
   classifyKoreanShape,
   toLegacyShapeId,
@@ -22,7 +27,7 @@ export async function loadModels(): Promise<void> {
         faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
       ]);
       modelsLoaded = true;
-    } catch (error) {
+    } catch {
       loadPromise = null;
       throw new FaceAnalysisError("load-failed", "AI 분석 모델을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
     }
@@ -54,15 +59,187 @@ function loadImage(dataUrl: string): Promise<HTMLImageElement> {
 }
 
 type Point = { x: number; y: number };
+type RGB = { r: number; g: number; b: number };
+type Lab = { L: number; a: number; b: number };
 
 function dist(a: Point, b: Point) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-/**
- * Classify face shape from 68-point landmarks.
- * Jaw line: 0-16, left/right cheek peaks ~1-2 / 14-15, chin: 8, brow line ~17-26.
- */
+// ============ Color space conversion ============
+
+function srgbToLinear(c: number): number {
+  const x = c / 255;
+  return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+}
+
+function rgbToLab(r: number, g: number, b: number): Lab {
+  const lr = srgbToLinear(r), lg = srgbToLinear(g), lb = srgbToLinear(b);
+  // sRGB D65 -> XYZ
+  const X = lr * 0.4124564 + lg * 0.3575761 + lb * 0.1804375;
+  const Y = lr * 0.2126729 + lg * 0.7151522 + lb * 0.072175;
+  const Z = lr * 0.0193339 + lg * 0.119192 + lb * 0.9503041;
+  const xn = X / 0.95047, yn = Y / 1.0, zn = Z / 1.08883;
+  const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  return { L: 116 * f(yn) - 16, a: 500 * (f(xn) - f(yn)), b: 200 * (f(yn) - f(zn)) };
+}
+
+function rgbToHsv(r: number, g: number, b: number) {
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const v = max / 255;
+  const s = max === 0 ? 0 : (max - min) / max;
+  let h = 0;
+  if (max !== min) {
+    if (max === r) h = ((g - b) / (max - min)) * 60;
+    else if (max === g) h = ((b - r) / (max - min)) * 60 + 120;
+    else h = ((r - g) / (max - min)) * 60 + 240;
+    if (h < 0) h += 360;
+  }
+  return { h, s, v };
+}
+
+// ============ Pixel sampling ============
+
+function samplePatch(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  radius: number,
+  width: number,
+  height: number,
+  applySkinFilter = true
+): RGB[] {
+  const x = Math.max(0, Math.round(cx - radius));
+  const y = Math.max(0, Math.round(cy - radius));
+  const w = Math.min(width - x, radius * 2);
+  const h = Math.min(height - y, radius * 2);
+  if (w <= 1 || h <= 1) return [];
+  const data = ctx.getImageData(x, y, w, h).data;
+  const out: RGB[] = [];
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    if (applySkinFilter) {
+      const Y = 0.299 * r + 0.587 * g + 0.114 * b;
+      const Cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+      const Cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+      if (Y < 40 || Y > 240) continue;
+      if (Cb < 77 || Cb > 127) continue;
+      if (Cr < 133 || Cr > 173) continue;
+    }
+    out.push({ r, g, b });
+  }
+  return out;
+}
+
+function meanRGB(px: RGB[]): RGB {
+  if (px.length === 0) return { r: 0, g: 0, b: 0 };
+  let r = 0, g = 0, b = 0;
+  for (const p of px) { r += p.r; g += p.g; b += p.b; }
+  return { r: r / px.length, g: g / px.length, b: b / px.length };
+}
+
+// ============ Region-based skin sampling ============
+
+type SkinRegion = "forehead" | "leftCheek" | "rightCheek" | "noseBridge" | "chin";
+
+type RegionSample = {
+  region: SkinRegion;
+  pixels: RGB[];
+  mean: RGB;
+  lab: Lab;
+};
+
+function sampleSkinRegions(
+  img: HTMLImageElement,
+  landmarks: Point[]
+): { regions: RegionSample[]; allPixels: RGB[]; ctx: CanvasRenderingContext2D; w: number; h: number } {
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(img, 0, 0);
+  const W = canvas.width, H = canvas.height;
+
+  const faceW = dist(landmarks[0], landmarks[16]);
+  const radius = Math.max(6, Math.round(faceW * 0.025));
+
+  const forehead: Point = {
+    x: (landmarks[19].x + landmarks[24].x) / 2,
+    y: landmarks[19].y - (landmarks[8].y - landmarks[27].y) * 0.28,
+  };
+
+  const regions: { region: SkinRegion; center: Point }[] = [
+    { region: "forehead", center: forehead },
+    { region: "leftCheek", center: { x: (landmarks[2].x + landmarks[31].x) / 2, y: (landmarks[2].y + landmarks[31].y) / 2 } },
+    { region: "rightCheek", center: { x: (landmarks[14].x + landmarks[35].x) / 2, y: (landmarks[14].y + landmarks[35].y) / 2 } },
+    { region: "noseBridge", center: landmarks[29] },
+    { region: "chin", center: { x: landmarks[8].x, y: landmarks[8].y - radius } },
+  ];
+
+  const samples: RegionSample[] = [];
+  const all: RGB[] = [];
+  for (const { region, center } of regions) {
+    const pixels = samplePatch(ctx, center.x, center.y, radius, W, H, true);
+    if (pixels.length === 0) continue;
+    const mean = meanRGB(pixels);
+    samples.push({ region, pixels, mean, lab: rgbToLab(mean.r, mean.g, mean.b) });
+    for (const p of pixels) all.push(p);
+  }
+
+  return { regions: samples, allPixels: all, ctx, w: W, h: H };
+}
+
+// ============ Gray World illumination correction ============
+
+function grayWorldCorrect(pixels: RGB[]): { gains: RGB; corrected: RGB[] } {
+  const mean = meanRGB(pixels);
+  const avg = (mean.r + mean.g + mean.b) / 3;
+  const gains: RGB = {
+    r: mean.r > 0 ? avg / mean.r : 1,
+    g: mean.g > 0 ? avg / mean.g : 1,
+    b: mean.b > 0 ? avg / mean.b : 1,
+  };
+  // Softer correction (50% strength) to avoid over-compensating tanned skin
+  const blend = 0.5;
+  gains.r = 1 + (gains.r - 1) * blend;
+  gains.g = 1 + (gains.g - 1) * blend;
+  gains.b = 1 + (gains.b - 1) * blend;
+  const corrected = pixels.map((p) => ({
+    r: Math.min(255, Math.max(0, p.r * gains.r)),
+    g: Math.min(255, Math.max(0, p.g * gains.g)),
+    b: Math.min(255, Math.max(0, p.b * gains.b)),
+  }));
+  return { gains, corrected };
+}
+
+// ============ Hair sampling for contrast ============
+
+function sampleHair(
+  ctx: CanvasRenderingContext2D,
+  landmarks: Point[],
+  W: number,
+  H: number
+): RGB | null {
+  // sample a band above the brows
+  const faceW = dist(landmarks[0], landmarks[16]);
+  const faceH = dist(landmarks[8], landmarks[27]);
+  const browMidX = (landmarks[19].x + landmarks[24].x) / 2;
+  const browY = Math.min(landmarks[19].y, landmarks[24].y);
+  const sampleY = browY - faceH * 0.55;
+  if (sampleY < 8) return null;
+  const radius = Math.max(8, Math.round(faceW * 0.12));
+  const px = samplePatch(ctx, browMidX, sampleY, radius, W, H, false);
+  if (px.length < 30) return null;
+  // pick the darker quartile (likely hair, not skin/background)
+  const sorted = [...px].sort(
+    (a, b) => (a.r + a.g + a.b) - (b.r + b.g + b.b)
+  );
+  const dark = sorted.slice(0, Math.max(20, Math.floor(sorted.length * 0.35)));
+  return meanRGB(dark);
+}
+
+// ============ Face shape (geometric) ============
+
 function classifyFaceShape(landmarks: Point[]) {
   const jaw = landmarks.slice(0, 17);
   const leftBrow = landmarks.slice(17, 22);
@@ -74,17 +251,10 @@ function classifyFaceShape(landmarks: Point[]) {
   const leftJaw = jaw[5];
   const rightJaw = jaw[11];
 
-  // approximate forehead top by mirroring brow above the eye line
   const browLeft = leftBrow[0];
   const browRight = rightBrow[rightBrow.length - 1];
-  const browMid = {
-    x: (browLeft.x + browRight.x) / 2,
-    y: (browLeft.y + browRight.y) / 2,
-  };
-  const foreheadTop = {
-    x: browMid.x,
-    y: browMid.y - dist(leftCheek, rightCheek) * 0.35,
-  };
+  const browMid = { x: (browLeft.x + browRight.x) / 2, y: (browLeft.y + browRight.y) / 2 };
+  const foreheadTop = { x: browMid.x, y: browMid.y - dist(leftCheek, rightCheek) * 0.35 };
 
   const faceLength = dist(foreheadTop, chin);
   const cheekWidth = dist(leftCheek, rightCheek);
@@ -94,30 +264,44 @@ function classifyFaceShape(landmarks: Point[]) {
   const lengthRatio = faceLength / cheekWidth;
   const jawCheek = jawWidth / cheekWidth;
   const foreheadJaw = foreheadWidth / jawWidth;
+  const foreheadCheek = foreheadWidth / cheekWidth;
 
-  // jaw angle: angle at point 5-8-11
+  // jaw angle at chin
   const v1 = { x: leftJaw.x - chin.x, y: leftJaw.y - chin.y };
   const v2 = { x: rightJaw.x - chin.x, y: rightJaw.y - chin.y };
-  const jawAngleDeg =
-    (Math.acos(
-      (v1.x * v2.x + v1.y * v2.y) /
-        (Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y))
-    ) *
-      180) /
-    Math.PI;
+  const jawAngleDeg = (Math.acos(
+    (v1.x * v2.x + v1.y * v2.y) / (Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y))
+  ) * 180) / Math.PI;
 
-  // Korean 안면지수 (facial index) — Python reference:
-  //   h = ||p[8] - p[27]||  (chin -> between-brows / nose root)
-  //   w = ||p[16] - p[0]||  (jaw width)
-  //   idx = (h / w) * 100
+  // Jaw curvature: deviation of midpoints from straight line
+  let curvature = 0;
+  for (let i = 1; i < 16; i++) {
+    const p = jaw[i];
+    const t = i / 16;
+    const lineX = jaw[0].x + t * (jaw[16].x - jaw[0].x);
+    const lineY = jaw[0].y + t * (jaw[16].y - jaw[0].y);
+    curvature += Math.hypot(p.x - lineX, p.y - lineY);
+  }
+  curvature /= 16 * cheekWidth;
+
+  // Korean facial index (nose root -> chin / jaw width)
   const noseRoot = landmarks[27];
   const noseToChin = dist(noseRoot, chin);
   const fullJawWidth = dist(landmarks[0], landmarks[16]);
   const facialIndex = (noseToChin / fullJawWidth) * 100;
 
+  // Heart vs Diamond detection
+  let extraNote = "";
   let id: string;
   let reason: string;
-  if (facialIndex >= 95) {
+
+  if (foreheadCheek > 1.0 && jawCheek < 0.78 && facialIndex >= 88) {
+    id = "heart";
+    reason = `이마(${foreheadWidth | 0}px)가 광대(${cheekWidth | 0}px)보다 넓고 턱이 좁은 V라인 — 하트형 패턴`;
+  } else if (foreheadCheek < 0.85 && jawCheek < 0.85 && facialIndex >= 90) {
+    id = "diamond";
+    reason = `광대가 가장 넓고 이마·턱이 좁은 입체 윤곽 — 다이아형 패턴`;
+  } else if (facialIndex >= 95) {
     id = "long";
     reason = `안면지수 ${facialIndex.toFixed(1)} — 세로가 가로보다 매우 깁니다 (초장안).`;
   } else if (facialIndex >= 90) {
@@ -134,10 +318,17 @@ function classifyFaceShape(landmarks: Point[]) {
     reason = `안면지수 ${facialIndex.toFixed(1)} — 가로 폭이 매우 넓고 턱이 또렷합니다 (초단안/각진형).`;
   }
 
+  // Annotate curvature/angle
+  if (id !== "heart" && id !== "diamond") {
+    if (jawAngleDeg < 110 && curvature < 0.04) extraNote = " 턱이 또렷한 각진 인상.";
+    else if (curvature > 0.06) extraNote = " 턱선이 부드럽게 둥근 인상.";
+  }
+
   const shape = FACE_SHAPES.find((s) => s.id === id) ?? FACE_SHAPES[0];
+
   return {
     shape,
-    reason,
+    reason: reason + extraNote,
     facialIndex,
     metrics: {
       faceLength: Math.round(faceLength),
@@ -148,113 +339,105 @@ function classifyFaceShape(landmarks: Point[]) {
       jawAngleDeg: +jawAngleDeg.toFixed(1),
       foreheadJaw: +foreheadJaw.toFixed(2),
       jawCheek: +jawCheek.toFixed(2),
+      foreheadCheek: +foreheadCheek.toFixed(2),
+      jawCurvature: +curvature.toFixed(3),
       facialIndex: +facialIndex.toFixed(1),
     },
   };
 }
 
-/**
- * Sample skin pixels from cheek + forehead regions and compute average HSV/YCbCr.
- */
-function analyzeSkin(
-  img: HTMLImageElement,
-  landmarks: Point[]
-) {
-  const canvas = document.createElement("canvas");
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
-  ctx.drawImage(img, 0, 0);
+// ============ Personal color (12-type) ============
 
-  const samplePoints: Point[] = [
-    landmarks[2], landmarks[3], landmarks[4], // left cheek
-    landmarks[12], landmarks[13], landmarks[14], // right cheek
-    { // forehead (above brow midpoint)
-      x: (landmarks[19].x + landmarks[24].x) / 2,
-      y: landmarks[19].y - (landmarks[8].y - landmarks[27].y) * 0.25,
-    },
-    landmarks[29], // nose bridge
-  ];
+type ColorFeatures = {
+  L: number;            // skin lightness 0..100
+  a: number;            // green-red
+  b: number;            // blue-yellow (warm if high)
+  chroma: number;       // sqrt(a^2 + b^2)
+  hue: number;          // 0..360
+  contrast: number;     // |L_skin - L_hair|
+  warmth: number;       // -1..1
+};
 
-  let r = 0, g = 0, b = 0, count = 0;
-  const radius = Math.max(4, Math.round(dist(landmarks[0], landmarks[16]) * 0.02));
-
-  for (const p of samplePoints) {
-    const x = Math.round(p.x);
-    const y = Math.round(p.y);
-    if (x < radius || y < radius || x > canvas.width - radius || y > canvas.height - radius) continue;
-    const data = ctx.getImageData(x - radius, y - radius, radius * 2, radius * 2).data;
-    for (let i = 0; i < data.length; i += 4) {
-      const pr = data[i], pg = data[i + 1], pb = data[i + 2];
-      // simple YCbCr skin filter
-      const Y = 0.299 * pr + 0.587 * pg + 0.114 * pb;
-      const Cb = 128 - 0.168736 * pr - 0.331264 * pg + 0.5 * pb;
-      const Cr = 128 + 0.5 * pr - 0.418688 * pg - 0.081312 * pb;
-      if (Y < 40 || Y > 240) continue;
-      if (Cb < 77 || Cb > 127) continue;
-      if (Cr < 133 || Cr > 173) continue;
-      r += pr; g += pg; b += pb; count++;
-    }
-  }
-
-  if (count < 50) {
-    throw new FaceAnalysisError("too-dark", "피부 영역을 충분히 검출하지 못했습니다. 더 밝은 조명에서 다시 시도해주세요.");
-  }
-
-  r = r / count;
-  g = g / count;
-  b = b / count;
-
-  // HSV
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  const v = max / 255;
-  const s = max === 0 ? 0 : (max - min) / max;
-  let h = 0;
-  if (max !== min) {
-    if (max === r) h = ((g - b) / (max - min)) * 60;
-    else if (max === g) h = ((b - r) / (max - min)) * 60 + 120;
-    else h = ((r - g) / (max - min)) * 60 + 240;
-    if (h < 0) h += 360;
-  }
-
-  // ITA (Individual Typology Angle) for skin warmth/cool: uses Lab b*-axis.
-  // Quick warm/cool: compare R-G vs B. Warm if (r-b) high & h closer to yellow (20-50).
-  const warmth = (r - b) / 255; // -1..1
-  const isWarm = warmth > 0.05 && h >= 15 && h <= 55;
-
-  const brightness = v; // 0..1
-  const saturation = s;
-
-  return { r, g, b, h, s: saturation, v: brightness, warmth, isWarm, sampleCount: count };
+function softmax(scores: Record<string, number>, temperature = 1.4): Record<string, number> {
+  const keys = Object.keys(scores);
+  const max = Math.max(...keys.map((k) => scores[k]));
+  const exps = keys.map((k) => Math.exp((scores[k] - max) / temperature));
+  const sum = exps.reduce((a, c) => a + c, 0);
+  const out: Record<string, number> = {};
+  keys.forEach((k, i) => { out[k] = exps[i] / sum; });
+  return out;
 }
 
-function classifyPersonalColor(skin: ReturnType<typeof analyzeSkin>) {
-  const { isWarm, v: brightness, s: saturation, warmth } = skin;
-  let id: string;
-  let reason: string;
+function classifyPersonalColor(features: ColorFeatures): {
+  pc: PersonalColor;
+  reason: string;
+  probabilities: { id: string; name: string; prob: number }[];
+  seasonProbs: Record<"spring" | "summer" | "autumn" | "winter", number>;
+} {
+  const { L, b, chroma, contrast, warmth } = features;
 
-  if (isWarm && brightness > 0.62) {
-    id = "spring-warm";
-    reason = `피부에 노란기(warmth ${warmth.toFixed(2)})가 있고 밝기 ${(brightness * 100).toFixed(0)}%로 화사합니다.`;
-  } else if (isWarm) {
-    id = "autumn-warm";
-    reason = `따뜻한 톤(warmth ${warmth.toFixed(2)})에 깊이 있는 밝기 ${(brightness * 100).toFixed(0)}%입니다.`;
-  } else if (brightness > 0.6 && saturation < 0.35) {
-    id = "summer-cool";
-    reason = `차가운 언더톤에 부드러운 채도(${(saturation * 100).toFixed(0)}%)와 밝은 피부입니다.`;
-  } else {
-    id = "winter-cool";
-    reason = `차가운 언더톤(warmth ${warmth.toFixed(2)})에 또렷한 대비감을 가집니다.`;
+  // Per-type prototype scoring (higher = better fit)
+  const score = (warm: number, light: number, deep: number, soft: number, clear: number) => {
+    return warm + light + deep + soft + clear;
+  };
+
+  const wWarm = warmth;          // -1..1
+  const wCool = -warmth;
+  const wLight = (L - 55) / 25;  // > 65 → light
+  const wDeep = (50 - L) / 25;   // < 40 → deep
+  const wSoft = (16 - chroma) / 10; // low chroma
+  const wClear = (chroma - 18) / 10; // high chroma
+  const wContrast = (contrast - 30) / 25;
+
+  const raw: Record<string, number> = {
+    "spring-light":  score(wWarm * 0.7, wLight * 1.1, 0, 0, 0) + 0.3,
+    "spring-warm":   score(wWarm * 1.4, wLight * 0.3, 0, 0, wClear * 0.3),
+    "spring-clear":  score(wWarm * 0.6, wLight * 0.6, 0, 0, wClear * 1.2 + wContrast * 0.4),
+    "summer-light":  score(wCool * 0.7, wLight * 1.1, 0, wSoft * 0.4, 0) + 0.3,
+    "summer-cool":   score(wCool * 1.4, wLight * 0.3, 0, wSoft * 0.4, 0),
+    "summer-soft":   score(wCool * 0.7, 0, 0, wSoft * 1.3, 0),
+    "autumn-soft":   score(wWarm * 0.8, 0, 0, wSoft * 1.2, 0),
+    "autumn-warm":   score(wWarm * 1.3, 0, wDeep * 0.5, 0, 0),
+    "autumn-deep":   score(wWarm * 0.7, 0, wDeep * 1.3, 0, 0),
+    "winter-cool":   score(wCool * 1.3, 0, wDeep * 0.4, 0, wClear * 0.3),
+    "winter-deep":   score(wCool * 0.8, 0, wDeep * 1.2, 0, wClear * 0.3),
+    "winter-clear":  score(wCool * 0.7, 0, wDeep * 0.5, 0, wClear * 1.2 + wContrast * 0.5),
+  };
+
+  const probs = softmax(raw, 0.6);
+  const ranked = Object.entries(probs)
+    .map(([id, prob]) => {
+      const meta = PERSONAL_COLORS.find((p) => p.id === id)!;
+      return { id, name: meta.name, prob };
+    })
+    .sort((a, b2) => b2.prob - a.prob);
+
+  const top = ranked[0];
+  const pc = PERSONAL_COLORS.find((p) => p.id === top.id)!;
+
+  const seasonProbs = { spring: 0, summer: 0, autumn: 0, winter: 0 };
+  for (const r of ranked) {
+    const meta = PERSONAL_COLORS.find((p) => p.id === r.id)!;
+    seasonProbs[meta.season] += r.prob;
   }
 
-  const pc = PERSONAL_COLORS.find((p) => p.id === id) ?? PERSONAL_COLORS[0];
-  return { pc, reason };
+  const reasonParts: string[] = [];
+  reasonParts.push(`피부 L*${L.toFixed(0)} / b*${b.toFixed(1)} → ${b > 14 ? "노란기 우세 (웜)" : "푸른기 우세 (쿨)"}`);
+  reasonParts.push(`채도 ${chroma.toFixed(1)} (${chroma > 18 ? "선명함" : chroma < 12 ? "탁함" : "중간"})`);
+  if (contrast > 0) reasonParts.push(`피부–머리카락 대비 ${contrast.toFixed(0)} (${contrast > 35 ? "강한 대비" : contrast < 20 ? "낮은 대비" : "중간"})`);
+  reasonParts.push(`→ ${pc.name} 매칭 ${(top.prob * 100).toFixed(0)}%`);
+
+  return { pc, reason: reasonParts.join(" · "), probabilities: ranked, seasonProbs };
 }
+
+// ============ Main exported type ============
+
+export type RegionStat = { region: SkinRegion; r: number; g: number; b: number; L: number; a: number; bAxis: number };
 
 export type RealAnalysisResult = AnalysisResult & {
   gender: Gender;
   reasons: { color: string; shape: string };
-  skin: { r: number; g: number; b: number; warmth: number; brightness: number; saturation: number };
+  skin: { r: number; g: number; b: number; warmth: number; brightness: number; saturation: number; L: number; a: number; bAxis: number; chroma: number };
   metrics: {
     faceLength: number;
     cheekWidth: number;
@@ -264,13 +447,25 @@ export type RealAnalysisResult = AnalysisResult & {
     jawAngleDeg: number;
     foreheadJaw: number;
     jawCheek: number;
+    foreheadCheek: number;
+    jawCurvature: number;
     facialIndex: number;
   };
   facialIndex: number;
   koreanShape: KoreanFaceShape;
   hairRecommendation: string;
   glassesRecommendation: string;
+
+  // New advanced fields
+  regions: RegionStat[];
+  hair: { r: number; g: number; b: number; L: number } | null;
+  contrast: number;
+  probabilities: { id: string; name: string; prob: number }[];
+  seasonProbabilities: { season: string; prob: number }[];
+  whiteBalanceGains: { r: number; g: number; b: number };
 };
+
+// ============ Orchestration ============
 
 export async function analyzeFace(
   dataUrl: string,
@@ -286,13 +481,9 @@ export async function analyzeFace(
   ];
 
   let detections: faceapi.WithFaceLandmarks<{ detection: faceapi.FaceDetection }>[] = [];
-
   for (const options of detectionOptions) {
     const result = await faceapi.detectAllFaces(img, options).withFaceLandmarks();
-    if (result.length > 0) {
-      detections = result;
-      break;
-    }
+    if (result.length > 0) { detections = result; break; }
   }
 
   if (detections.length === 0) {
@@ -313,18 +504,69 @@ export async function analyzeFace(
     throw new FaceAnalysisError("not-frontal", "얼굴이 너무 옆으로 돌아가 있습니다. 카메라를 정면으로 보고 다시 촬영해주세요.");
   }
 
+  // Face shape
   const { shape, reason: shapeReason, metrics, facialIndex } = classifyFaceShape(points);
   const koreanShape = classifyKoreanShape(facialIndex);
   const legacyId = toLegacyShapeId(koreanShape.id);
-  const finalShape = FACE_SHAPES.find((s) => s.id === legacyId) ?? shape;
+  // Prefer geometric shape (heart/diamond) if detected, else fall back to korean mapping
+  const finalShape = (shape.id === "heart" || shape.id === "diamond")
+    ? shape
+    : (FACE_SHAPES.find((s) => s.id === legacyId) ?? shape);
 
-  const skin = analyzeSkin(img, points);
-  const { pc, reason: colorReason } = classifyPersonalColor(skin);
+  // Skin regions
+  const { regions, allPixels, ctx, w, h } = sampleSkinRegions(img, points);
+  if (allPixels.length < 80) {
+    throw new FaceAnalysisError("too-dark", "피부 영역을 충분히 검출하지 못했습니다. 더 밝은 조명에서 다시 시도해주세요.");
+  }
 
+  // Gray-world illumination correction over all skin pixels
+  const { gains, corrected } = grayWorldCorrect(allPixels);
+
+  // Corrected mean per region (apply same gains)
+  const regionStats: RegionStat[] = regions.map((rg) => {
+    const r = Math.min(255, rg.mean.r * gains.r);
+    const g = Math.min(255, rg.mean.g * gains.g);
+    const b = Math.min(255, rg.mean.b * gains.b);
+    const lab = rgbToLab(r, g, b);
+    return { region: rg.region, r: Math.round(r), g: Math.round(g), b: Math.round(b), L: +lab.L.toFixed(1), a: +lab.a.toFixed(1), bAxis: +lab.b.toFixed(1) };
+  });
+
+  // Overall corrected skin
+  const meanCorrected = meanRGB(corrected);
+  const skinLab = rgbToLab(meanCorrected.r, meanCorrected.g, meanCorrected.b);
+  const skinHsv = rgbToHsv(meanCorrected.r, meanCorrected.g, meanCorrected.b);
+  const chroma = Math.hypot(skinLab.a, skinLab.b);
+  const warmth = Math.max(-1, Math.min(1, (skinLab.b - 14) / 12));
+
+  // Hair sampling for contrast
+  const hairMean = sampleHair(ctx, points, w, h);
+  let hairLab: Lab | null = null;
+  let contrast = 0;
+  if (hairMean) {
+    const r = Math.min(255, hairMean.r * gains.r);
+    const g = Math.min(255, hairMean.g * gains.g);
+    const b = Math.min(255, hairMean.b * gains.b);
+    hairLab = rgbToLab(r, g, b);
+    contrast = Math.abs(skinLab.L - hairLab.L);
+  }
+
+  // Personal color classification
+  const { pc, reason: colorReason, probabilities, seasonProbs } = classifyPersonalColor({
+    L: skinLab.L,
+    a: skinLab.a,
+    b: skinLab.b,
+    chroma,
+    hue: skinHsv.h,
+    contrast,
+    warmth,
+  });
+
+  // Confidence
   const detScore = det.detection.score;
-  const sampleQ = Math.min(1, skin.sampleCount / 1500);
+  const sampleQ = Math.min(1, allPixels.length / 1500);
   const frontalQ = Math.max(0, 1 - offset / 0.2);
-  const confidence = Math.round((detScore * 0.5 + sampleQ * 0.25 + frontalQ * 0.25) * 100);
+  const topProb = probabilities[0]?.prob ?? 0.5;
+  const confidence = Math.round((detScore * 0.4 + sampleQ * 0.2 + frontalQ * 0.2 + topProb * 0.2) * 100);
 
   return {
     personalColor: pc,
@@ -335,17 +577,34 @@ export async function analyzeFace(
     gender,
     reasons: { color: colorReason, shape: shapeReason },
     skin: {
-      r: Math.round(skin.r),
-      g: Math.round(skin.g),
-      b: Math.round(skin.b),
-      warmth: +skin.warmth.toFixed(3),
-      brightness: +skin.v.toFixed(3),
-      saturation: +skin.s.toFixed(3),
+      r: Math.round(meanCorrected.r),
+      g: Math.round(meanCorrected.g),
+      b: Math.round(meanCorrected.b),
+      warmth: +warmth.toFixed(3),
+      brightness: +skinHsv.v.toFixed(3),
+      saturation: +skinHsv.s.toFixed(3),
+      L: +skinLab.L.toFixed(1),
+      a: +skinLab.a.toFixed(1),
+      bAxis: +skinLab.b.toFixed(1),
+      chroma: +chroma.toFixed(1),
     },
     metrics,
     facialIndex: +facialIndex.toFixed(1),
     koreanShape,
     hairRecommendation: koreanShape.hair[gender],
     glassesRecommendation: koreanShape.glasses[gender],
+    regions: regionStats,
+    hair: hairMean
+      ? {
+          r: Math.round(Math.min(255, hairMean.r * gains.r)),
+          g: Math.round(Math.min(255, hairMean.g * gains.g)),
+          b: Math.round(Math.min(255, hairMean.b * gains.b)),
+          L: hairLab ? +hairLab.L.toFixed(1) : 0,
+        }
+      : null,
+    contrast: +contrast.toFixed(1),
+    probabilities,
+    seasonProbabilities: Object.entries(seasonProbs).map(([season, prob]) => ({ season, prob })),
+    whiteBalanceGains: { r: +gains.r.toFixed(3), g: +gains.g.toFixed(3), b: +gains.b.toFixed(3) },
   };
 }
