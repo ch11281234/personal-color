@@ -302,12 +302,12 @@ function classifyFaceShape(landmarks: Point[]) {
   } else if (foreheadCheek < 0.85 && jawCheek < 0.85 && facialIndex >= 90) {
     id = "diamond";
     reason = `광대가 가장 넓고 이마·턱이 좁은 입체 윤곽 — 다이아형 패턴`;
-  } else if (facialIndex >= 95) {
+  } else if (facialIndex >= 92) {
     id = "long";
-    reason = `안면지수 ${facialIndex.toFixed(1)} — 세로가 가로보다 매우 깁니다 (초장안).`;
-  } else if (facialIndex >= 90) {
+    reason = `안면지수 ${facialIndex.toFixed(1)} — 얼굴의 세로 비율이 뚜렷하게 길어 장안형에 가깝습니다.`;
+  } else if (facialIndex >= 86) {
     id = "long";
-    reason = `안면지수 ${facialIndex.toFixed(1)} — 세로 비율이 긴 편입니다 (장안).`;
+    reason = `안면지수 ${facialIndex.toFixed(1)} — 얼굴의 세로 비율이 평균보다 길어 긴형 경향이 있습니다.`;
   } else if (facialIndex >= 85) {
     id = "oval";
     reason = `안면지수 ${facialIndex.toFixed(1)} — 황금비에 가까운 균형 잡힌 비율입니다 (중안/계란형).`;
