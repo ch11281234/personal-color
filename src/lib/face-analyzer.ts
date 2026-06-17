@@ -284,11 +284,12 @@ function classifyFaceShape(landmarks: Point[]) {
   }
   curvature /= 16 * cheekWidth;
 
-  // Korean facial index (nose root -> chin / jaw width)
-  const noseRoot = landmarks[27];
-  const noseToChin = dist(noseRoot, chin);
-  const fullJawWidth = dist(landmarks[0], landmarks[16]);
-  const facialIndex = (noseToChin / fullJawWidth) * 100;
+  // Korean facial index
+  // old: noseRoot -> chin / jaw width
+  // new: foreheadTop -> chin (full face length) / max(cheekWidth, jawWidth)
+  const fullFaceLength = faceLength;
+  const fullFaceWidth = Math.max(cheekWidth, jawWidth);
+  const facialIndex = (fullFaceLength / fullFaceWidth) * 100;
 
   // Heart vs Diamond detection
   let extraNote = "";
