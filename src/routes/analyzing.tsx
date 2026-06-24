@@ -25,6 +25,7 @@ function AnalyzingPage() {
   const [image, setImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const ranRef = useRef(false);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (ranRef.current) return;
@@ -37,15 +38,11 @@ function AnalyzingPage() {
     }
     setImage(img);
 
-    let cancelled = false;
     let p = 0;
-    const tick = setInterval(() => {
-      // ease toward 95 while waiting on real work
+    tickRef.current = setInterval(() => {
       p = Math.min(95, p + (95 - p) * 0.06 + 0.5);
-      if (!cancelled) {
-        setProgress(p);
-        setStage(Math.min(STAGES.length - 1, Math.floor((p / 100) * STAGES.length)));
-      }
+      setProgress(p);
+      setStage(Math.min(STAGES.length - 1, Math.floor((p / 100) * STAGES.length)));
     }, 100);
 
     (async () => {
@@ -53,24 +50,19 @@ function AnalyzingPage() {
         const { analyzeFace, loadModels } = await import("@/lib/face-analyzer");
         await loadModels();
         const result = await analyzeFace(img, loadGender() ?? "male");
-        if (cancelled) return;
         saveAnalysis(result);
-        clearInterval(tick);
+        if (tickRef.current) clearInterval(tickRef.current);
         setProgress(100);
         setStage(STAGES.length - 1);
         setTimeout(() => navigate({ to: "/result" }), 400);
       } catch (e: unknown) {
-        if (cancelled) return;
-        clearInterval(tick);
+        if (tickRef.current) clearInterval(tickRef.current);
         const msg = e instanceof Error ? e.message : "분석 중 오류가 발생했습니다.";
         setError(msg);
       }
     })();
-
-    return () => {
-      cancelled = true;
-      clearInterval(tick);
-    };
+    // No cleanup that cancels the work — React 18 StrictMode would otherwise
+    // kill the interval/analyze immediately on the dev-only double-invoke.
   }, [navigate]);
 
   const r = 88;
