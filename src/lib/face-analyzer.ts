@@ -284,12 +284,28 @@ function classifyFaceShape(landmarks: Point[]) {
   }
   curvature /= 16 * cheekWidth;
 
-  // Korean facial index
-  // old: noseRoot -> chin / jaw width
-  // new: foreheadTop -> chin (full face length) / max(cheekWidth, jawWidth)
-  const fullFaceLength = faceLength;
-  const fullFaceWidth = Math.max(cheekWidth, jawWidth);
-  const facialIndex = (fullFaceLength / fullFaceWidth) * 100;
+  // 안면지수 보정 계산
+  // noseToChin만 사용하면 이마 길이가 빠져 안면지수가 낮게 나오고,
+  // faceLength를 그대로 사용하면 이마 추정값이 과하게 반영되어 120~130대로 튈 수 있습니다.
+  // 따라서 noseToChin을 기본 세로값으로 두고, 제한된 이마 추정값만 더합니다.
+  const noseRoot = landmarks[27];
+  const noseTip = landmarks[30];
+  const noseToChin = dist(noseRoot, chin);
+  const noseLength = dist(noseRoot, noseTip);
+  const foreheadPartFromFaceLength = Math.max(0, faceLength - noseToChin);
+  const foreheadByNose = noseLength * 0.85;
+  const rawForeheadEstimate =
+    foreheadByNose * 0.6 + foreheadPartFromFaceLength * 0.4;
+  const minForehead = noseToChin * 0.18;
+  const maxForehead = noseToChin * 0.35;
+  const estimatedForeheadLength = Math.min(
+    maxForehead,
+    Math.max(minForehead, rawForeheadEstimate)
+  );
+  const correctedFaceLength = noseToChin + estimatedForeheadLength;
+  const cheekboneWidth = dist(landmarks[1], landmarks[15]);
+  const fullFaceWidth = Math.max(cheekboneWidth, cheekWidth);
+  const facialIndex = (correctedFaceLength / fullFaceWidth) * 100;
 
   // Heart vs Diamond detection
   let extraNote = "";
