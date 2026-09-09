@@ -297,7 +297,7 @@ function classifyFaceShape(landmarks: Point[]) {
   const rawForeheadEstimate =
     foreheadByNose * 0.6 + foreheadPartFromFaceLength * 0.4;
   const minForehead = noseToChin * 0.18;
-  const maxForehead = noseToChin * 0.1;
+  const maxForehead = noseToChin * 0.17;
   const estimatedForeheadLength = Math.min(
     maxForehead,
     Math.max(minForehead, rawForeheadEstimate)
