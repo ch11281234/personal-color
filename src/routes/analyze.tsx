@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { Camera, Image as ImageIcon, Sparkles, Upload, User, UserRound, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { saveGender, saveImage } from "@/lib/analysis-store";
 import type { Gender } from "@/lib/hair-recommendations";
@@ -21,8 +21,8 @@ function AnalyzePage() {
   const [gender, setGender] = useState<Gender | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   const handleFile = (file: File) => {
     if (!file.type.startsWith("image/")) return;
