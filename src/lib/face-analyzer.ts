@@ -373,6 +373,7 @@ type ColorFeatures = {
   hue: number;          // 0..360
   contrast: number;     // |L_skin - L_hair|
   warmth: number;       // -1..1
+  tmSeason?: { top: "spring" | "summer" | "autumn" | "winter"; probs: Record<"spring" | "summer" | "autumn" | "winter", number> };
 };
 
 function softmax(scores: Record<string, number>, temperature = 1.4): Record<string, number> {
