@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect } from "react";
 import {
   Outlet,
   Link,
@@ -113,6 +114,12 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // Preload the Teachable Machine season model in the background on app load.
+  useEffect(() => {
+    import("@/lib/tm-season").then((m) => m.loadSeasonModel()).catch(() => {});
+  }, []);
+
 
   return (
     <QueryClientProvider client={queryClient}>
