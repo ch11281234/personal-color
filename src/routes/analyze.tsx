@@ -184,6 +184,101 @@ function AnalyzePage() {
   );
 }
 
+function CameraCapture({
+  onCapture,
+  onClose,
+}: {
+  onCapture: (dataUrl: string) => void;
+  onClose: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 960 } } })
+      .then((stream) => {
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      })
+      .catch(() => setError("카메라 권한을 허용해주세요. 브라우저 설정에서 카메라 접근을 켤 수 있습니다."));
+    return () => {
+      cancelled = true;
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  const capture = () => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    // 셀카처럼 보이도록 좌우 반전 저장
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0);
+    onCapture(canvas.toDataURL("image/jpeg", 0.92));
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-[min(92vw,640px)] rounded-3xl border border-border bg-card p-4 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute right-3 top-3 z-10 glass flex h-9 w-9 items-center justify-center rounded-full"
+          aria-label="닫기"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        {error ? (
+          <p className="px-4 py-16 text-center text-sm text-muted-foreground">{error}</p>
+        ) : (
+          <>
+            <div className="relative overflow-hidden rounded-2xl bg-black">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full -scale-x-100"
+              />
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div className="h-56 w-44 rounded-[50%] border-2 border-dashed border-primary/70" />
+              </div>
+            </div>
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              얼굴을 타원 안에 맞추고 정면을 바라봐주세요
+            </p>
+            <div className="mt-4 flex justify-center">
+              <button
+                onClick={capture}
+                className="inline-flex items-center gap-2 rounded-full bg-gradient-primary px-8 py-3 text-sm font-semibold text-primary-foreground shadow-glow transition-transform hover:scale-[1.03]"
+              >
+                <Camera className="h-4 w-4" /> 촬영하기
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Tip({ text }: { text: string }) {
   return (
     <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm">
