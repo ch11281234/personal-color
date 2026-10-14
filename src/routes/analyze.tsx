@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { motion } from "framer-motion";
-import { Camera, Image as ImageIcon, Sparkles, Upload, User, UserRound, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Camera, Image as ImageIcon, RefreshCw, Sparkles, Upload, User, UserRound, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { saveGender, saveImage } from "@/lib/analysis-store";
 import type { Gender } from "@/lib/hair-recommendations";
