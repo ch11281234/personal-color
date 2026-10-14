@@ -373,7 +373,6 @@ type ColorFeatures = {
   hue: number;          // 0..360
   contrast: number;     // |L_skin - L_hair|
   warmth: number;       // -1..1
-  tmSeason?: { top: "spring" | "summer" | "autumn" | "winter"; probs: Record<"spring" | "summer" | "autumn" | "winter", number> };
 };
 
 function softmax(scores: Record<string, number>, temperature = 1.4): Record<string, number> {
@@ -423,15 +422,6 @@ function classifyPersonalColor(features: ColorFeatures): {
   };
 
   const probs = softmax(raw, 0.6);
-  // Teachable Machine decides the season; existing color features pick the sub-type within it.
-  if (features.tmSeason) {
-    const tm = features.tmSeason;
-    for (const pcMeta of PERSONAL_COLORS) {
-      const s = pcMeta.season;
-      const within = PERSONAL_COLORS.filter((p) => p.season === s).reduce((a, p) => a + probs[p.id], 0) || 1;
-      probs[pcMeta.id] = (probs[pcMeta.id] / within) * tm.probs[s];
-    }
-  }
   const ranked = Object.entries(probs)
     .map(([id, prob]) => {
       const meta = PERSONAL_COLORS.find((p) => p.id === id)!;
@@ -439,9 +429,7 @@ function classifyPersonalColor(features: ColorFeatures): {
     })
     .sort((a, b2) => b2.prob - a.prob);
 
-  const top = features.tmSeason
-    ? ranked.find((r) => PERSONAL_COLORS.find((p) => p.id === r.id)!.season === features.tmSeason!.top)!
-    : ranked[0];
+  const top = ranked[0];
   const pc = PERSONAL_COLORS.find((p) => p.id === top.id)!;
 
   const seasonProbs = { spring: 0, summer: 0, autumn: 0, winter: 0 };
@@ -579,10 +567,6 @@ export async function analyzeFace(
     contrast = Math.abs(skinLab.L - hairLab.L);
   }
 
-  // Season from Teachable Machine model
-  const { predictSeason } = await import("./tm-season");
-  const tmSeason = await predictSeason(img);
-
   // Personal color classification
   const { pc, reason: colorReason, probabilities, seasonProbs } = classifyPersonalColor({
     L: skinLab.L,
@@ -592,7 +576,6 @@ export async function analyzeFace(
     hue: skinHsv.h,
     contrast,
     warmth,
-    tmSeason,
   });
 
   // Confidence
