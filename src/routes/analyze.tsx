@@ -110,20 +110,22 @@ function AnalyzePage() {
               <ImageIcon className="h-4 w-4" /> 갤러리에서 선택
             </button>
             <button
-              onClick={() => cameraRef.current?.click()}
+              onClick={() => setCameraOpen(true)}
               className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-medium hover:bg-secondary"
             >
               <Camera className="h-4 w-4" /> 카메라 촬영
             </button>
-            <input
-              ref={cameraRef}
-              type="file"
-              accept="image/*"
-              capture="user"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-            />
           </div>
+
+          {cameraOpen && (
+            <CameraCapture
+              onCapture={(dataUrl) => {
+                setPreview(dataUrl);
+                setCameraOpen(false);
+              }}
+              onClose={() => setCameraOpen(false)}
+            />
+          )}
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             <Tip text="정면을 바라보는 사진" />
