@@ -20,8 +20,8 @@ function AnalyzePage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [gender, setGender] = useState<Gender | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   const handleFile = (file: File) => {
@@ -30,6 +30,11 @@ function AnalyzePage() {
     reader.onload = (e) => setPreview(e.target?.result as string);
     reader.readAsDataURL(file);
   };
+
+  const handleCapture = useCallback((dataUrl: string) => {
+    setPreview(dataUrl);
+    setCameraOpen(false);
+  }, []);
 
   const startAnalysis = () => {
     if (!preview || !gender) return;
@@ -110,19 +115,11 @@ function AnalyzePage() {
               <ImageIcon className="h-4 w-4" /> 갤러리에서 선택
             </button>
             <button
-              onClick={() => cameraRef.current?.click()}
+              onClick={() => setCameraOpen(true)}
               className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-medium hover:bg-secondary"
             >
               <Camera className="h-4 w-4" /> 카메라 촬영
             </button>
-            <input
-              ref={cameraRef}
-              type="file"
-              accept="image/*"
-              capture="user"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-            />
           </div>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
@@ -178,7 +175,126 @@ function AnalyzePage() {
           </div>
         </motion.div>
       </section>
+
+      <AnimatePresence>
+        {cameraOpen && (
+          <CameraModal onCapture={handleCapture} onClose={() => setCameraOpen(false)} />
+        )}
+      </AnimatePresence>
     </Layout>
+  );
+}
+
+function CameraModal({ onCapture, onClose }: { onCapture: (dataUrl: string) => void; onClose: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [facing, setFacing] = useState<"user" | "environment">("user");
+
+  useEffect(() => {
+    let cancelled = false;
+    const start = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 960 } },
+          audio: false,
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+      } catch {
+        if (!cancelled) setError("카메라에 접근할 수 없습니다. 브라우저 카메라 권한을 허용해주세요.");
+      }
+    };
+    start();
+    return () => {
+      cancelled = true;
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    };
+  }, [facing]);
+
+  const capture = () => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    if (facing === "user") {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0);
+    onCapture(canvas.toDataURL("image/jpeg", 0.92));
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 16 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 16 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg overflow-hidden rounded-3xl border border-border bg-card shadow-glow"
+      >
+        <div className="flex items-center justify-between px-5 py-3">
+          <p className="font-display text-sm font-semibold">카메라 촬영</p>
+          <button onClick={onClose} className="glass flex h-8 w-8 items-center justify-center rounded-full" aria-label="닫기">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="relative aspect-[4/3] bg-black">
+          {error ? (
+            <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+              <Camera className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">{error}</p>
+            </div>
+          ) : (
+            <>
+              <video ref={videoRef} playsInline muted className={`h-full w-full object-cover ${facing === "user" ? "-scale-x-100" : ""}`} />
+              {/* 얼굴 가이드라인 */}
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div className="h-[72%] w-[54%] rounded-[50%] border-2 border-dashed border-primary/70 shadow-[0_0_24px_rgba(37,99,235,0.35)]" />
+              </div>
+              <p className="pointer-events-none absolute bottom-3 left-0 right-0 text-center text-xs text-white/80">
+                얼굴을 타원 안에 맞춰주세요
+              </p>
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center justify-center gap-3 px-5 py-4">
+          <button
+            onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}
+            className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-secondary"
+          >
+            <RefreshCw className="h-4 w-4" /> 전환
+          </button>
+          <button
+            onClick={capture}
+            disabled={!!error}
+            className="inline-flex items-center gap-2 rounded-full bg-gradient-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-glow disabled:opacity-40"
+          >
+            <Camera className="h-4 w-4" /> 촬영
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
