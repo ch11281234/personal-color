@@ -20,8 +20,8 @@ function AnalyzePage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [gender, setGender] = useState<Gender | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   const handleFile = (file: File) => {
@@ -30,6 +30,11 @@ function AnalyzePage() {
     reader.onload = (e) => setPreview(e.target?.result as string);
     reader.readAsDataURL(file);
   };
+
+  const handleCapture = useCallback((dataUrl: string) => {
+    setPreview(dataUrl);
+    setCameraOpen(false);
+  }, []);
 
   const startAnalysis = () => {
     if (!preview || !gender) return;
