@@ -9,7 +9,7 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "ISAAC AI — AI 퍼스널컬러 & 얼굴형 진단" },
-      { name: "description", content: "사진 한 장으로 퍼스널 컬러와 얼굴형을 분석하고 어울리는 스타일을 추천받는 AI 서비스." }, { property: "og:title", content: "ISAAC AI — AI 퍼스널컬러 & 얼굴형 진단" }, { property: "og:description", content: "사진 한 장으로 퍼스널 컬러와 얼굴형을 분석하고 어울리는 스타일을 추천받는 AI 서비스." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" },
+      { name: "description", content: "사진 한 장으로 퍼스널 컬러와 얼굴형을 분석하고 어울리는 스타일을 추천받는 AI 서비스." },
     ],
   }),
   component: Index,

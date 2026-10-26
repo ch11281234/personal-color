@@ -6,7 +6,7 @@ import { Layout } from "@/components/Layout";
 import { loadGender, loadImage, saveAnalysis } from "@/lib/analysis-store";
 
 export const Route = createFileRoute("/analyzing")({
-  head: () => ({ meta: [{ title: "분석 중 — ISAAC AI" }, { name: "description", content: "ISAAC AI가 얼굴 사진의 계절과 피부톤, 얼굴형을 분석합니다." }, { property: "og:title", content: "분석 중 — ISAAC AI" }, { property: "og:description", content: "ISAAC AI가 얼굴 사진의 계절과 피부톤, 얼굴형을 분석합니다." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
+  head: () => ({ meta: [{ title: "분석 중 — ISAAC AI" }] }),
   component: AnalyzingPage,
 });
 
@@ -15,7 +15,7 @@ const STAGES = [
   "얼굴 랜드마크 검출 중...",
   "피부 픽셀 샘플링 중...",
   "얼굴 비율 계산 중...",
-  "계절 분류 및 퍼스널 컬러 매칭 중...",
+  "퍼스널 컬러 매칭 중...",
 ];
 
 function AnalyzingPage() {
@@ -130,7 +130,7 @@ function AnalyzingPage() {
             <div className="mx-auto mt-10 grid max-w-md grid-cols-3 gap-2 text-xs text-muted-foreground">
               <Metric label="Landmarks" value="68" />
               <Metric label="Skin px" value="∼2k" />
-              <Metric label="Models" value="3" />
+              <Metric label="Models" value="2" />
             </div>
           </>
         )}

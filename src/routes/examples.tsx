@@ -8,7 +8,7 @@ export const Route = createFileRoute("/examples")({
   head: () => ({
     meta: [
       { title: "결과 예시 — ISAAC AI" },
-      { name: "description", content: "ISAAC AI가 제공하는 퍼스널컬러·얼굴형 분석 결과 샘플." }, { property: "og:title", content: "결과 예시 — ISAAC AI" }, { property: "og:description", content: "ISAAC AI가 제공하는 퍼스널컬러·얼굴형 분석 결과 샘플." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" },
+      { name: "description", content: "ISAAC AI가 제공하는 퍼스널컬러·얼굴형 분석 결과 샘플." },
     ],
   }),
   component: ExamplesPage,
