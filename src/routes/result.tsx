@@ -7,7 +7,7 @@ import type { RealAnalysisResult } from "@/lib/face-analyzer";
 import { loadAnalysis } from "@/lib/analysis-store";
 
 export const Route = createFileRoute("/result")({
-  head: () => ({ meta: [{ title: "분석 결과 — ISAAC AI" }] }),
+  head: () => ({ meta: [{ title: "분석 결과 — ISAAC AI" }, { name: "description", content: "ISAAC AI 계절 분류와 상세 퍼스널 컬러, 헤어 및 안경 추천 결과." }, { property: "og:title", content: "분석 결과 — ISAAC AI" }, { property: "og:description", content: "ISAAC AI 계절 분류와 상세 퍼스널 컬러, 헤어 및 안경 추천 결과." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
   component: ResultPage,
 });
 
@@ -200,10 +200,11 @@ function ResultPage() {
               <div className="flex items-center justify-between">
                 <span className="font-mono text-xs uppercase tracking-widest text-primary">Personal Color · 12-type</span>
                 <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary capitalize">
-                  {pc.tone} · {pc.dominant}
+                  {pc.tone === "warm" ? "웜톤" : "쿨톤"} · {pc.dominant}
                 </span>
               </div>
               <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">{pc.name}</h2>
+              {data.seasonPrediction && <p className="mt-2 text-sm font-semibold text-primary">계절 모델 · {SEASON_LABEL[data.seasonPrediction.season]} · {(data.seasonPrediction.confidence * 100).toFixed(0)}% 분류 점수</p>}
               <p className="mt-2 text-sm text-muted-foreground">{pc.description}</p>
               <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
                 <span className="font-mono text-primary">AI 근거 · </span>{data.reasons.color}
@@ -211,7 +212,7 @@ function ResultPage() {
 
               {/* Season probabilities */}
               <div className="mt-5">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">계절 확률 분포</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{data.seasonPrediction ? "계절 모델 분류 점수" : "계절 확률 분포"}</p>
                 <div className="space-y-1.5">
                   {seasonProbs.map((s) => (
                     <div key={s.season} className="flex items-center gap-2 text-xs">
@@ -232,7 +233,7 @@ function ResultPage() {
 
               {/* Top sub-types */}
               <div className="mt-4">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Top 4 세부 유형</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{data.seasonPrediction ? `${SEASON_LABEL[pc.season]} 세부 유형 매칭` : "Top 4 세부 유형"}</p>
                 <div className="grid grid-cols-2 gap-1.5">
                   {topProbs.map((t, i) => (
                     <div key={t.id} className={`flex items-center justify-between rounded-lg border px-2 py-1.5 text-[11px] ${i === 0 ? "border-primary/40 bg-primary/5" : "border-border bg-surface"}`}>

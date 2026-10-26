@@ -1,4 +1,6 @@
 import * as faceapi from "face-api.js";
+import { predictSeason } from "./teachable-season";
+import { scoresWithinSeason, SEASON_LABELS, type Season, type SeasonPrediction } from "./season-policy";
 import {
   FACE_SHAPES,
   PERSONAL_COLORS,
@@ -385,7 +387,7 @@ function softmax(scores: Record<string, number>, temperature = 1.4): Record<stri
   return out;
 }
 
-function classifyPersonalColor(features: ColorFeatures): {
+function classifyPersonalColor(features: ColorFeatures, season?: Season): {
   pc: PersonalColor;
   reason: string;
   probabilities: { id: string; name: string; prob: number }[];
@@ -421,25 +423,28 @@ function classifyPersonalColor(features: ColorFeatures): {
     "winter-clear":  score(wCool * 0.7, 0, wDeep * 0.5, 0, wClear * 1.2 + wContrast * 0.5),
   };
 
-  const probs = softmax(raw, 0.6);
+  const probs = softmax(scoresWithinSeason(raw, season), 0.6);
   const ranked = Object.entries(probs)
     .map(([id, prob]) => {
-      const meta = PERSONAL_COLORS.find((p) => p.id === id)!;
+      const meta = PERSONAL_COLORS.find((p) => p.id === id);
+      if (!meta) throw new Error("퍼스널 컬러 유형을 찾지 못했습니다.");
       return { id, name: meta.name, prob };
     })
     .sort((a, b2) => b2.prob - a.prob);
 
   const top = ranked[0];
-  const pc = PERSONAL_COLORS.find((p) => p.id === top.id)!;
+  const pc = PERSONAL_COLORS.find((p) => p.id === top?.id);
+  if (!pc) throw new Error("퍼스널 컬러 유형을 찾지 못했습니다.");
 
   const seasonProbs = { spring: 0, summer: 0, autumn: 0, winter: 0 };
   for (const r of ranked) {
-    const meta = PERSONAL_COLORS.find((p) => p.id === r.id)!;
+    const meta = PERSONAL_COLORS.find((p) => p.id === r.id);
+    if (!meta) continue;
     seasonProbs[meta.season] += r.prob;
   }
 
   const reasonParts: string[] = [];
-  reasonParts.push(`피부 L*${L.toFixed(0)} / b*${b.toFixed(1)} → ${b > 14 ? "노란기 우세 (웜)" : "푸른기 우세 (쿨)"}`);
+  reasonParts.push(`피부 L*${L.toFixed(0)} / b*${b.toFixed(1)} · ${pc.tone === "warm" ? "웜톤" : "쿨톤"}`);
   reasonParts.push(`채도 ${chroma.toFixed(1)} (${chroma > 18 ? "선명함" : chroma < 12 ? "탁함" : "중간"})`);
   if (contrast > 0) reasonParts.push(`피부–머리카락 대비 ${contrast.toFixed(0)} (${contrast > 35 ? "강한 대비" : contrast < 20 ? "낮은 대비" : "중간"})`);
   reasonParts.push(`→ ${pc.name} 매칭 ${(top.prob * 100).toFixed(0)}%`);
@@ -452,6 +457,7 @@ function classifyPersonalColor(features: ColorFeatures): {
 export type RegionStat = { region: SkinRegion; r: number; g: number; b: number; L: number; a: number; bAxis: number };
 
 export type RealAnalysisResult = AnalysisResult & {
+  seasonPrediction?: SeasonPrediction;
   gender: Gender;
   reasons: { color: string; shape: string };
   skin: { r: number; g: number; b: number; warmth: number; brightness: number; saturation: number; L: number; a: number; bAxis: number; chroma: number };
@@ -568,7 +574,8 @@ export async function analyzeFace(
   }
 
   // Personal color classification
-  const { pc, reason: colorReason, probabilities, seasonProbs } = classifyPersonalColor({
+  const seasonPrediction = await predictSeason(img);
+  const { pc, reason: colorReason, probabilities } = classifyPersonalColor({
     L: skinLab.L,
     a: skinLab.a,
     b: skinLab.b,
@@ -576,7 +583,7 @@ export async function analyzeFace(
     hue: skinHsv.h,
     contrast,
     warmth,
-  });
+  }, seasonPrediction.season);
 
   // Confidence
   const detScore = det.detection.score;
@@ -592,7 +599,8 @@ export async function analyzeFace(
     imageUrl: dataUrl,
     analyzedAt: new Date().toISOString(),
     gender,
-    reasons: { color: colorReason, shape: shapeReason },
+    seasonPrediction,
+    reasons: { color: `계절 모델: ${SEASON_LABELS[seasonPrediction.season]} · ${colorReason}`, shape: shapeReason },
     skin: {
       r: Math.round(meanCorrected.r),
       g: Math.round(meanCorrected.g),
@@ -621,7 +629,7 @@ export async function analyzeFace(
       : null,
     contrast: +contrast.toFixed(1),
     probabilities,
-    seasonProbabilities: Object.entries(seasonProbs).map(([season, prob]) => ({ season, prob })),
+    seasonProbabilities: seasonPrediction.probabilities,
     whiteBalanceGains: { r: +gains.r.toFixed(3), g: +gains.g.toFixed(3), b: +gains.b.toFixed(3) },
   };
 }

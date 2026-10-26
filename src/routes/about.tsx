@@ -7,7 +7,7 @@ export const Route = createFileRoute("/about")({
   head: () => ({
     meta: [
       { title: "About ISAAC — AI · 코딩 · 테크 동아리" },
-      { name: "description", content: "아이작(ISAAC)은 AI, 코딩, 테크 서비스를 연구하는 개발 동아리입니다." },
+      { name: "description", content: "아이작(ISAAC)은 AI, 코딩, 테크 서비스를 연구하는 개발 동아리입니다." }, { property: "og:title", content: "About ISAAC — AI · 코딩 · 테크 동아리" }, { property: "og:description", content: "아이작(ISAAC)은 AI, 코딩, 테크 서비스를 연구하는 개발 동아리입니다." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: AboutPage,
