@@ -7,7 +7,7 @@ import type { RealAnalysisResult } from "@/lib/face-analyzer";
 import { loadAnalysis } from "@/lib/analysis-store";
 
 export const Route = createFileRoute("/result")({
-  head: () => ({ meta: [{ title: "분석 결과 — ISAAC AI" }] }),
+  head: () => ({ meta: [{ title: "분석 결과 — ISAAC AI" }, { name: "description", content: "ISAAC AI 계절 분류와 상세 퍼스널 컬러, 헤어 및 안경 추천 결과." }, { property: "og:title", content: "분석 결과 — ISAAC AI" }, { property: "og:description", content: "ISAAC AI 계절 분류와 상세 퍼스널 컬러, 헤어 및 안경 추천 결과." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
   component: ResultPage,
 });
 

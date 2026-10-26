@@ -13,7 +13,7 @@ export const Route = createFileRoute("/analyze")({
   head: () => ({
     meta: [
       { title: "AI 분석 — ISAAC AI" },
-      { name: "description", content: "정면 사진을 업로드하면 AI가 퍼스널 컬러와 얼굴형을 분석합니다." },
+      { name: "description", content: "정면 사진을 업로드하면 AI가 퍼스널 컬러와 얼굴형을 분석합니다." }, { property: "og:title", content: "AI 분석 — ISAAC AI" }, { property: "og:description", content: "정면 사진을 업로드하면 AI가 퍼스널 컬러와 얼굴형을 분석합니다." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: AnalyzePage,
@@ -97,13 +97,13 @@ function AnalyzePage() {
             {preview ? (
               <div className="relative">
                 <img src={preview} alt="미리보기" className="mx-auto max-h-[480px] w-auto" />
-                <button
+                <Button
                   onClick={() => setPreview(null)}
                   className="absolute right-3 top-3 glass flex h-9 w-9 items-center justify-center rounded-full"
                   aria-label="제거"
                 >
                   <X className="h-4 w-4" />
-                </button>
+                </Button>
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/40 to-transparent" />
               </div>
             ) : (
@@ -126,18 +126,18 @@ function AnalyzePage() {
           {preview && <SeasonPrediction prediction={prediction} error={seasonError} />}
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-            <button
+            <Button
               onClick={() => inputRef.current?.click()}
               className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-medium hover:bg-secondary"
             >
               <ImageIcon className="h-4 w-4" /> 갤러리에서 선택
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setCameraOpen(true)}
               className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-medium hover:bg-secondary"
             >
               <Camera className="h-4 w-4" /> 카메라 촬영
-            </button>
+            </Button>
           </div>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
@@ -150,7 +150,7 @@ function AnalyzePage() {
             <p className="text-center text-xs font-mono uppercase tracking-widest text-primary">Step 02 · 성별 선택</p>
             <p className="mt-1 text-center text-sm text-muted-foreground">성별에 맞춘 헤어/안경 추천을 제공합니다.</p>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:max-w-md sm:mx-auto">
-              <button
+              <Button
                 onClick={() => setGender("male")}
                 className={`group flex flex-col items-center gap-2 rounded-2xl border-2 px-4 py-5 transition-all ${
                   gender === "male"
@@ -160,8 +160,8 @@ function AnalyzePage() {
               >
                 <User className={`h-7 w-7 ${gender === "male" ? "text-primary" : "text-muted-foreground"}`} />
                 <span className="text-sm font-semibold">남성 (Male)</span>
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setGender("female")}
                 className={`group flex flex-col items-center gap-2 rounded-2xl border-2 px-4 py-5 transition-all ${
                   gender === "female"
@@ -171,19 +171,19 @@ function AnalyzePage() {
               >
                 <UserRound className={`h-7 w-7 ${gender === "female" ? "text-primary" : "text-muted-foreground"}`} />
                 <span className="text-sm font-semibold">여성 (Female)</span>
-              </button>
+              </Button>
             </div>
           </div>
 
           <div className="mt-10 flex flex-col items-center gap-3">
-            <button
+            <Button
               disabled={!preview || !gender || !prediction}
               onClick={startAnalysis}
               className="group inline-flex items-center gap-2 rounded-full bg-gradient-primary px-8 py-3.5 text-sm font-semibold text-primary-foreground shadow-glow transition-all enabled:hover:scale-[1.03] disabled:opacity-40"
             >
               <Sparkles className="h-4 w-4" />
               AI 분석 시작
-            </button>
+            </Button>
             {!gender && preview && (
               <p className="text-xs text-muted-foreground">성별을 선택해주세요</p>
             )}
@@ -299,9 +299,9 @@ function CameraModal({ onCapture, onClose }: { onCapture: (dataUrl: string) => v
       >
         <div className="flex items-center justify-between px-5 py-3">
           <p className="font-display text-sm font-semibold">카메라 촬영</p>
-          <button onClick={onClose} className="glass flex h-8 w-8 items-center justify-center rounded-full" aria-label="닫기">
+          <Button onClick={onClose} className="glass flex h-8 w-8 items-center justify-center rounded-full" aria-label="닫기">
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
 
         <div className="relative aspect-[4/3] bg-secondary">
@@ -326,19 +326,19 @@ function CameraModal({ onCapture, onClose }: { onCapture: (dataUrl: string) => v
         {!error && <SeasonPrediction prediction={prediction} error={seasonError} />}
 
         <div className="flex items-center justify-center gap-3 px-5 py-4">
-          <button
+          <Button
             onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}
             className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-secondary"
           >
             <RefreshCw className="h-4 w-4" /> 전환
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={capture}
             disabled={!!error || !ready}
             className="inline-flex items-center gap-2 rounded-full bg-gradient-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-glow disabled:opacity-40"
           >
             <Camera className="h-4 w-4" /> 촬영
-          </button>
+          </Button>
         </div>
       </motion.div>
     </motion.div>

@@ -6,7 +6,7 @@ import { Layout } from "@/components/Layout";
 import { loadGender, loadImage, saveAnalysis } from "@/lib/analysis-store";
 
 export const Route = createFileRoute("/analyzing")({
-  head: () => ({ meta: [{ title: "분석 중 — ISAAC AI" }] }),
+  head: () => ({ meta: [{ title: "분석 중 — ISAAC AI" }, { name: "description", content: "ISAAC AI가 얼굴 사진의 계절과 피부톤, 얼굴형을 분석합니다." }, { property: "og:title", content: "분석 중 — ISAAC AI" }, { property: "og:description", content: "ISAAC AI가 얼굴 사진의 계절과 피부톤, 얼굴형을 분석합니다." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
   component: AnalyzingPage,
 });
 
