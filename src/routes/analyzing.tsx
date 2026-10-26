@@ -15,7 +15,7 @@ const STAGES = [
   "얼굴 랜드마크 검출 중...",
   "피부 픽셀 샘플링 중...",
   "얼굴 비율 계산 중...",
-  "퍼스널 컬러 매칭 중...",
+  "계절 분류 및 퍼스널 컬러 매칭 중...",
 ];
 
 function AnalyzingPage() {
@@ -130,7 +130,7 @@ function AnalyzingPage() {
             <div className="mx-auto mt-10 grid max-w-md grid-cols-3 gap-2 text-xs text-muted-foreground">
               <Metric label="Landmarks" value="68" />
               <Metric label="Skin px" value="∼2k" />
-              <Metric label="Models" value="2" />
+              <Metric label="Models" value="3" />
             </div>
           </>
         )}

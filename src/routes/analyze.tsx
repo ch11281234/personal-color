@@ -3,6 +3,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Camera, Image as ImageIcon, RefreshCw, Sparkles, Upload, User, UserRound, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/Layout";
+import { Button } from "@/components/ui/button";
+import { SeasonPrediction } from "@/components/SeasonPrediction";
+import type { SeasonPrediction as Prediction } from "@/lib/season-policy";
 import { saveGender, saveImage } from "@/lib/analysis-store";
 import type { Gender } from "@/lib/hair-recommendations";
 
@@ -21,8 +24,24 @@ function AnalyzePage() {
   const [gender, setGender] = useState<Gender | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [prediction, setPrediction] = useState<Prediction | null>(null);
+  const [seasonError, setSeasonError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let cancelled = false;
+    setPrediction(null);
+    setSeasonError(null);
+    if (preview) {
+      void import("@/lib/teachable-season").then((m) => m.predictPhotoSeason(preview)).then((result) => {
+        if (!cancelled) setPrediction(result);
+      }).catch((e: unknown) => {
+        if (!cancelled) setSeasonError(e instanceof Error ? e.message : "계절 분석에 실패했습니다.");
+      });
+    }
+    return () => { cancelled = true; };
+  }, [preview]);
 
   const handleFile = (file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -96,16 +115,15 @@ function AnalyzePage() {
                   <p className="font-display text-xl font-semibold">클릭 또는 드래그하여 업로드</p>
                   <p className="mt-1 text-sm text-muted-foreground">JPG, PNG · 최대 10MB</p>
                 </div>
-                <input
-                  ref={inputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-                />
               </label>
             )}
           </div>
+          <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFile(file);
+            e.target.value = "";
+          }} />
+          {preview && <SeasonPrediction prediction={prediction} error={seasonError} />}
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
             <button
@@ -159,7 +177,7 @@ function AnalyzePage() {
 
           <div className="mt-10 flex flex-col items-center gap-3">
             <button
-              disabled={!preview || !gender}
+              disabled={!preview || !gender || !prediction}
               onClick={startAnalysis}
               className="group inline-flex items-center gap-2 rounded-full bg-gradient-primary px-8 py-3.5 text-sm font-semibold text-primary-foreground shadow-glow transition-all enabled:hover:scale-[1.03] disabled:opacity-40"
             >
@@ -190,9 +208,17 @@ function CameraModal({ onCapture, onClose }: { onCapture: (dataUrl: string) => v
   const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [facing, setFacing] = useState<"user" | "environment">("user");
+  const [prediction, setPrediction] = useState<Prediction | null>(null);
+  const [seasonError, setSeasonError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    setError(null);
+    setPrediction(null);
+    setSeasonError(null);
+    setReady(false);
     const start = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -207,6 +233,25 @@ function CameraModal({ onCapture, onClose }: { onCapture: (dataUrl: string) => v
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
+          if (cancelled) return;
+          setReady(true);
+          const classify = async () => {
+            if (cancelled) return;
+            const video = videoRef.current;
+            if (!video || video.readyState < 2) {
+              timer = setTimeout(classify, 500);
+              return;
+            }
+            try {
+              const { predictSeason } = await import("@/lib/teachable-season");
+              const result = await predictSeason(video, facing === "user");
+              if (!cancelled) { setPrediction(result); setSeasonError(null); }
+            } catch (e: unknown) {
+              if (!cancelled) setSeasonError(e instanceof Error ? e.message : "계절 분석에 실패했습니다.");
+            }
+            if (!cancelled) timer = setTimeout(classify, 700);
+          };
+          void classify();
         }
       } catch {
         if (!cancelled) setError("카메라에 접근할 수 없습니다. 브라우저 카메라 권한을 허용해주세요.");
@@ -215,6 +260,7 @@ function CameraModal({ onCapture, onClose }: { onCapture: (dataUrl: string) => v
     start();
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
@@ -258,7 +304,7 @@ function CameraModal({ onCapture, onClose }: { onCapture: (dataUrl: string) => v
           </button>
         </div>
 
-        <div className="relative aspect-[4/3] bg-black">
+        <div className="relative aspect-[4/3] bg-secondary">
           {error ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
               <Camera className="h-8 w-8 text-muted-foreground" />
@@ -269,14 +315,15 @@ function CameraModal({ onCapture, onClose }: { onCapture: (dataUrl: string) => v
               <video ref={videoRef} playsInline muted className={`h-full w-full object-cover ${facing === "user" ? "-scale-x-100" : ""}`} />
               {/* 얼굴 가이드라인 */}
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <div className="h-[72%] w-[54%] rounded-[50%] border-2 border-dashed border-primary/70 shadow-[0_0_24px_rgba(37,99,235,0.35)]" />
+                <div className="h-[72%] w-[54%] rounded-[50%] border-2 border-dashed border-primary/70 shadow-glow" />
               </div>
-              <p className="pointer-events-none absolute bottom-3 left-0 right-0 text-center text-xs text-white/80">
+              <p className="pointer-events-none absolute bottom-3 left-0 right-0 bg-background/80 py-1 text-center text-xs text-foreground">
                 얼굴을 타원 안에 맞춰주세요
               </p>
             </>
           )}
         </div>
+        {!error && <SeasonPrediction prediction={prediction} error={seasonError} />}
 
         <div className="flex items-center justify-center gap-3 px-5 py-4">
           <button
@@ -287,7 +334,7 @@ function CameraModal({ onCapture, onClose }: { onCapture: (dataUrl: string) => v
           </button>
           <button
             onClick={capture}
-            disabled={!!error}
+            disabled={!!error || !ready}
             className="inline-flex items-center gap-2 rounded-full bg-gradient-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-glow disabled:opacity-40"
           >
             <Camera className="h-4 w-4" /> 촬영
