@@ -48,7 +48,8 @@ function AnalyzingPage() {
     (async () => {
       try {
         const { analyzeFace, loadModels } = await import("@/lib/face-analyzer");
-        await loadModels();
+        const { loadTMModel } = await import("@/lib/tm-season");
+        await Promise.all([loadModels(), loadTMModel()]);
         const result = await analyzeFace(img, loadGender() ?? "male");
         saveAnalysis(result);
         if (tickRef.current) clearInterval(tickRef.current);
