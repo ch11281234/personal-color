@@ -1,0 +1,2 @@
+Browser-only TM inference lives in a lazy-loaded helper with an isolated script TensorFlow runtime, so existing face-api inference and result presentation remain unchanged.
+TM supplies only the season to the existing personal-color classifier; subtype scoring and recommendations remain in that classifier.

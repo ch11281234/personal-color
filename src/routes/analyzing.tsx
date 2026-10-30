@@ -6,7 +6,14 @@ import { Layout } from "@/components/Layout";
 import { loadGender, loadImage, saveAnalysis } from "@/lib/analysis-store";
 
 export const Route = createFileRoute("/analyzing")({
-  head: () => ({ meta: [{ title: "분석 중 — ISAAC AI" }] }),
+  head: () => ({ meta: [
+    { title: "분석 중 — ISAAC AI" },
+    { name: "description", content: "ISAAC AI가 얼굴 사진의 퍼스널 컬러와 얼굴형을 분석합니다." },
+    { property: "og:title", content: "분석 중 — ISAAC AI" },
+    { property: "og:description", content: "ISAAC AI가 얼굴 사진의 퍼스널 컬러와 얼굴형을 분석합니다." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ] }),
   component: AnalyzingPage,
 });
 
@@ -48,7 +55,8 @@ function AnalyzingPage() {
     (async () => {
       try {
         const { analyzeFace, loadModels } = await import("@/lib/face-analyzer");
-        await loadModels();
+        const { loadTMModel } = await import("@/lib/tm-season");
+        await Promise.all([loadModels(), loadTMModel()]);
         const result = await analyzeFace(img, loadGender() ?? "male");
         saveAnalysis(result);
         if (tickRef.current) clearInterval(tickRef.current);

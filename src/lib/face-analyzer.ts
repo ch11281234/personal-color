@@ -1,4 +1,5 @@
 import * as faceapi from "face-api.js";
+import { predictSeason, type Season } from "./tm-season";
 import {
   FACE_SHAPES,
   PERSONAL_COLORS,
@@ -385,7 +386,7 @@ function softmax(scores: Record<string, number>, temperature = 1.4): Record<stri
   return out;
 }
 
-function classifyPersonalColor(features: ColorFeatures): {
+function classifyPersonalColor(features: ColorFeatures, season: Season): {
   pc: PersonalColor;
   reason: string;
   probabilities: { id: string; name: string; prob: number }[];
@@ -421,7 +422,7 @@ function classifyPersonalColor(features: ColorFeatures): {
     "winter-clear":  score(wCool * 0.7, 0, wDeep * 0.5, 0, wClear * 1.2 + wContrast * 0.5),
   };
 
-  const probs = softmax(raw, 0.6);
+  const probs = softmax(Object.fromEntries(Object.entries(raw).filter(([id]) => id.startsWith(`${season}-`))), 0.6);
   const ranked = Object.entries(probs)
     .map(([id, prob]) => {
       const meta = PERSONAL_COLORS.find((p) => p.id === id)!;
@@ -490,6 +491,7 @@ export async function analyzeFace(
 ): Promise<RealAnalysisResult> {
   await loadModels();
   const img = await loadImage(dataUrl);
+  const season = await predictSeason(img);
 
   const detectionOptions = [
     new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.3 }),
@@ -576,7 +578,7 @@ export async function analyzeFace(
     hue: skinHsv.h,
     contrast,
     warmth,
-  });
+  }, season);
 
   // Confidence
   const detScore = det.detection.score;
