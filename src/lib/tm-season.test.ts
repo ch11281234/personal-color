@@ -6,7 +6,7 @@ describe("user's TM season mapping", () => {
   test("uses the requested model", () => {
     expect(TM_MODEL_URL).toBe("https://teachablemachine.withgoogle.com/models/peK9bvLnO/");
   });
-  for (const [label, season] of [["Class 1", "spring"], ["Class 2", "summer"], ["Class 3", "autumn"], ["Class 4", "winter"]]) {
+  for (const [label, season] of [["Class 1", "spring"], ["Class 2", "summer"], ["Class 3", "autumn"], ["Class 4", "winter"]] as const) {
     test(`${label} selects ${season}`, () => {
       expect(selectSeason(["Class 1", "Class 2", "Class 3", "Class 4"].map(className => ({ className, probability: className === label ? 0.9 : 0.03 })))).toBe(season);
     });
