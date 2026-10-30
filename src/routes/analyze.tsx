@@ -11,6 +11,10 @@ export const Route = createFileRoute("/analyze")({
     meta: [
       { title: "AI 분석 — ISAAC AI" },
       { name: "description", content: "정면 사진을 업로드하면 AI가 퍼스널 컬러와 얼굴형을 분석합니다." },
+      { property: "og:title", content: "AI 분석 — ISAAC AI" },
+      { property: "og:description", content: "정면 사진을 업로드하면 AI가 퍼스널 컬러와 얼굴형을 분석합니다." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: AnalyzePage,
